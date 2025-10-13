@@ -1,5 +1,5 @@
 ---
-# Переменные специфичные для Docker установки
+# Docker vars
 docker_users:
   - vagrant
 

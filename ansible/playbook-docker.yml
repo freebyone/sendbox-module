@@ -1,6 +1,6 @@
 ---
 - name: Setup Docker and run hello-world on all cluster nodes
-  hosts: main
+  hosts: docker
   become: yes
 
   tasks:

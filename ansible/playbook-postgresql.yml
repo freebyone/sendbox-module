@@ -1,0 +1,9 @@
+---
+- name: Deploy and setup Postgresql
+  hosts: postgresql
+  become: yes
+
+  tasks:
+    - name: Import PostgreSQL role
+      import_role:
+        name: postgresql
