@@ -1,0 +1,48 @@
+- name: Install backup dependencies
+  become: true
+  package:
+    name:
+      - python3-pip
+      - postgresql-client
+    state: present
+  when: backup_enabled
+
+- name: Install pgBackRest
+  become: true
+  package:
+    name: pgbackrest
+    state: present
+  when: backup_enabled and backup_method == "pgbackrest"
+
+- name: Configure pgBackRest
+  template:
+    src: pgbackrest.conf.j2
+    dest: "/etc/pgbackrest/pgbackrest.conf"
+    owner: "postgres"
+    group: "postgres"
+    mode: '0640'
+  when: backup_enabled and backup_method == "pgbackrest"
+
+- name: Create backup script
+  template:
+    src: backup-script.sh.j2
+    dest: "/usr/local/bin/postgres-backup.sh"
+    owner: "postgres"
+    group: "postgres"
+    mode: '0750'
+  when: backup_enabled
+
+- name: Configure cron job for backups
+  cron:
+    name: "PostgreSQL backup"
+    job: "/usr/local/bin/postgres-backup.sh >> /var/log/postgres-backup.log 2>&1"
+    minute: "0"
+    hour: "2"
+    user: "postgres"
+  when: backup_enabled
+
+- name: Create stanza (initial backup setup)
+  command: "pgbackrest --stanza=main stanza-create"
+  become: true
+  become_user: postgres
+  when: backup_enabled and backup_method == "pgbackrest"

@@ -1,0 +1,42 @@
+---
+- name: Install PgBouncer
+  become: true
+  package:
+    name: pgbouncer
+    state: present
+  when: pgbouncer_enabled
+
+- name: Create PgBouncer configuration
+  template:
+    src: pgbouncer.ini.j2
+    dest: "/etc/pgbouncer/pgbouncer.ini"
+    owner: "postgres"
+    group: "postgres"
+    mode: '0640'
+  when: pgbouncer_enabled
+
+- name: Create PgBouncer HBA configuration
+  template:
+    src: pgb_hba.conf.j2
+    dest: "/etc/pgbouncer/pgb_hba.conf"
+    owner: "postgres"
+    group: "postgres"
+    mode: '0640'
+  when: pgbouncer_enabled
+
+- name: Create userlist file
+  template:
+    src: userlist.txt.j2
+    dest: "/etc/pgbouncer/userlist.txt"
+    owner: "postgres"
+    group: "postgres"
+    mode: '0640'
+  when: pgbouncer_enabled
+
+- name: Start and enable PgBouncer
+  become: true
+  systemd:
+    name: pgbouncer
+    state: started
+    enabled: yes
+  when: pgbouncer_enabled

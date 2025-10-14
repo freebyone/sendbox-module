@@ -1,0 +1,10 @@
+- name: restart patroni
+  community.docker.docker_container:
+    name: "patroni-{{ inventory_hostname }}"
+    state: restarted
+
+- name: reload pgbouncer
+  become: yes
+  systemd:
+    name: pgbouncer
+    state: reloaded

@@ -1,0 +1,45 @@
+scope: {{ patroni_scope }}
+name: {{ inventory_hostname }}
+
+restapi:
+  listen: 0.0.0.0:{{ patroni_restapi_port }}
+  connect_address: {{ ansible_host }}:{{ patroni_restapi_port }}
+
+etcd:
+  hosts: {% for server in etcd_servers %}{{ server }}{% if not loop.last %},{% endif %}{% endfor %}
+
+bootstrap:
+  dcs:
+    ttl: 30
+    loop_wait: 10
+    retry_timeout: 10
+    maximum_lag_on_failover: 1048576
+    postgresql:
+      use_pg_rewind: true
+      use_slots: true
+      parameters:
+        wal_level: {{ postgresql_parameters.wal_level }}
+        hot_standby: {{ postgresql_parameters.hot_standby }}
+        max_connections: {{ postgresql_parameters.max_connections }}
+        max_wal_senders: 10
+        max_replication_slots: 10
+        wal_keep_segments: 64
+
+  initdb:
+  - encoding: UTF8
+  - data-checksums
+
+  pg_hba:
+  - host replication replicator 0.0.0.0/0 md5
+  - host all all 0.0.0.0/0 md5
+
+postgresql:
+  listen: 0.0.0.0:{{ patroni_port }}
+  connect_address: {{ ansible_host }}:{{ patroni_port }}
+  data_dir: {{ postgresql_data_dir }}
+  pgpass: /tmp/pgpass
+  parameters:
+    max_connections: {{ postgresql_parameters.max_connections }}
+    shared_buffers: {{ postgresql_parameters.shared_buffers }}
+    wal_level: {{ postgresql_parameters.wal_level }}
+    hot_standby: {{ postgresql_parameters.hot_standby }}

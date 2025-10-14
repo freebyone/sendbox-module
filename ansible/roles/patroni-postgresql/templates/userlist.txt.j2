@@ -1,0 +1,4 @@
+{% for user in users %}
+"{{ user.name }}" "md5{{ user.password | password_hash('md5') }}"
+{% endfor %}
+"postgres" "md5{{ postgres_superuser_password | password_hash('md5') }}"

@@ -1,0 +1,43 @@
+- name: Check if primary node
+  uri:
+    url: "http://{{ ansible_host }}:{{ patroni_restapi_port }}/patroni"
+    method: GET
+  register: patroni_info
+  delegate_to: localhost
+  run_once: true
+
+- name: Set primary node fact
+  set_fact:
+    primary_node: "{{ patroni_info.json.role == 'master' or patroni_info.json.role == 'leader' }}"
+
+- name: Create databases on primary
+  community.postgresql.postgresql_db:
+    name: "{{ item.name }}"
+    owner: "{{ item.owner | default(omit) }}"
+    encoding: "{{ item.encoding | default('UTF8') }}"
+    state: present
+  loop: "{{ databases }}"
+  when: primary_node
+  tags: create_db
+
+- name: Create users on primary
+  community.postgresql.postgresql_user:
+    name: "{{ item.name }}"
+    password: "{{ item.password }}"
+    role_attr_flags: "{{ item.privileges | join(',') }}"
+    state: present
+  loop: "{{ users }}"
+  when: primary_node
+  tags: create_user
+
+- name: Grant database privileges
+  community.postgresql.postgresql_privs:
+    database: "{{ item.0 }}"
+    roles: "{{ item.1.name }}"
+    privs: "CONNECT"
+    state: present
+  with_subelements:
+    - "{{ users }}"
+    - databases
+  when: primary_node
+  tags: grant_privs

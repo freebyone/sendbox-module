@@ -1,0 +1,38 @@
+- name: Stop and remove Patroni containers
+  community.docker.docker_container:
+    name: "patroni-{{ inventory_hostname }}"
+    state: absent
+    force_kill: yes
+
+- name: Remove Docker network
+  community.docker.docker_network:
+    name: "{{ docker_network }}"
+    state: absent
+
+- name: Remove data directories
+  become: true
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ postgresql_data_dir }}"
+    - "{{ postgresql_wal_dir }}"
+    - "/etc/patroni"
+
+- name: Stop and remove PgBouncer
+  become: true
+  package:
+    name: pgbouncer
+    state: absent
+  when: pgbouncer_enabled
+
+- name: Remove backup configurations
+  become: true
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/etc/pgbackrest"
+    - "/usr/local/bin/postgres-backup.sh"
+    - "/var/log/postgres-backup.log"
+  when: backup_enabled
