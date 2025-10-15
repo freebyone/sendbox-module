@@ -1,0 +1,44 @@
+global
+    daemon
+    maxconn 10000
+
+defaults
+    log global
+    mode tcp
+    retries 2
+    timeout client 30m
+    timeout connect 4s
+    timeout server 30m
+    timeout check 5s
+
+# PostgreSQL read/write
+listen postgres_rw
+    bind *:{{ haproxy_frontend_port }}
+    mode tcp
+    balance first
+    option httpchk OPTIONS /master
+    http-check expect status 200
+    {% for host in groups['patroni_cluster'] %}
+    server {{ host }} {{ host }}:{{ postgresql_port }} check port {{ patroni_restapi_port }}
+    {% endfor %}
+
+# PostgreSQL read-only
+listen postgres_ro
+    bind *:{{ haproxy_frontend_port | int + 1 }}
+    mode tcp
+    balance roundrobin
+    option httpchk OPTIONS /replica
+    http-check expect status 200
+    {% for host in groups['patroni_cluster'] %}
+    server {{ host }} {{ host }}:{{ postgresql_port }} check port {{ patroni_restapi_port }}
+    {% endfor %}
+
+# HAProxy Statistics
+listen stats
+    bind *:{{ haproxy_stats_port }}
+    mode http
+    stats enable
+    stats hide-version
+    stats realm Haproxy\ Statistics
+    stats uri /
+    stats auth {{ haproxy_stats_user }}:{{ haproxy_stats_password }}

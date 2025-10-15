@@ -1,0 +1,40 @@
+scope: {{ patroni_scope }}
+name: {{ inventory_hostname }}
+
+restapi:
+  listen: 0.0.0.0:{{ patroni_restapi_port }}
+  connect_address: {{ inventory_hostname }}:{{ patroni_restapi_port }}
+
+etcd:
+  hosts: {{ etcd_servers }}
+
+bootstrap:
+  dcs:
+    ttl: 30
+    loop_wait: 10
+    retry_timeout: 10
+    maximum_lag_on_failover: 1048576
+    postgresql:
+      use_pg_rewind: true
+      use_slots: true
+      parameters:
+        {% for key, value in postgresql_parameters.items() %}
+        {{ key }}: {{ value }}
+        {% endfor %}
+
+  initdb:
+  - encoding: UTF8
+  - data-checksums
+
+  pg_hba:
+  - host replication replicator 0.0.0.0/0 md5
+  - host all all 0.0.0.0/0 md5
+
+postgresql:
+  listen: 0.0.0.0:{{ postgresql_port }}
+  connect_address: {{ inventory_hostname }}:{{ postgresql_port }}
+  data_dir: {{ postgresql_data_dir }}
+  parameters:
+    {% for key, value in postgresql_parameters.items() %}
+    {{ key }}: {{ value }}
+    {% endfor %}

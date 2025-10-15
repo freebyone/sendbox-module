@@ -1,0 +1,8 @@
+haproxy_frontend_port: 5000
+haproxy_stats_port: 1936
+haproxy_stats_user: "admin"
+haproxy_stats_password: "admin"
+
+# Все ноды в кластере
+postgresql_port: 5432
+patroni_restapi_port: 8008

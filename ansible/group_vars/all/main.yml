@@ -7,3 +7,36 @@ ansible_python_interpreter: /usr/bin/python3
 cluster_name: "vagrant-cluster"
 cluster_network: "192.168.56.0/24"
 jump_host: "jump"
+
+
+# Common variables
+cluster_name: "postgres-cluster"
+
+environment: "prod"
+
+# Database configuration
+databases:
+  - name: app
+    owner: user
+  - name: monitoring
+    owner: postgres
+
+users:
+  - name: user
+    password: "{{ vault_app_password }}"
+  - name: readuser
+    password: "{{ vault_read_password }}"
+    privileges: ["LOGIN"]
+
+# PgBouncer configuration
+pgbouncer_databases:
+  - name: myapp
+  - name: monitoring
+
+# Port configuration
+etcd_client_port: 2379
+etcd_peer_port: 2380
+patroni_restapi_port: 8008
+postgresql_port: 5432
+pgbouncer_port: 6432
+haproxy_frontend_port: 5000

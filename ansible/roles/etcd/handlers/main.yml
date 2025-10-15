@@ -1,0 +1,9 @@
+- name: restart etcd
+  systemd:
+    name: etcd
+    state: restarted
+
+- name: reload etcd
+  systemd:
+    name: etcd
+    state: reloaded

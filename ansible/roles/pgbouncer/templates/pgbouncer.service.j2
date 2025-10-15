@@ -1,0 +1,15 @@
+[Unit]
+Description=PgBouncer connection pooler
+Documentation=man:pgbouncer(1)
+After=network.target
+
+[Service]
+Type=forking
+User=pgbouncer
+Group=pgbouncer
+ExecStart=/usr/bin/pgbouncer -d /etc/pgbouncer/pgbouncer.ini
+ExecReload=/usr/bin/pgbouncer -R /etc/pgbouncer/pgbouncer.ini
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

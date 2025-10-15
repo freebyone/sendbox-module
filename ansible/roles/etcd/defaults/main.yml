@@ -1,0 +1,12 @@
+etcd_version: "3.5"
+etcd_cluster_name: "etcd-cluster"
+etcd_data_dir: "/var/lib/etcd"
+etcd_client_port: 2379
+etcd_peer_port: 2380
+
+etcd_initial_cluster: "{{ groups['etcd_cluster'] | map('extract', hostvars, ['etcd_node_name']) | list | join(',') }}"
+
+etcd_auto_compaction_mode: "revision"
+etcd_auto_compaction_retention: "1000"
+
+etcd_systemd_restart: "always"
