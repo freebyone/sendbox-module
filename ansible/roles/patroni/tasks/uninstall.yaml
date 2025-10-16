@@ -1,14 +1,4 @@
-- name: Stop and remove Patroni containers
-  community.docker.docker_container:
-    name: "patroni-{{ inventory_hostname }}"
-    state: absent
-    force_kill: yes
-
-- name: Remove Docker network
-  community.docker.docker_network:
-    name: "{{ docker_network }}"
-    state: absent
-
+---
 - name: Remove data directories
   become: true
   file:

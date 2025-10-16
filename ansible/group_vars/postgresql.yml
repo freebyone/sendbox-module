@@ -24,3 +24,31 @@ postgresql_pg_hba_config:
   - { type: host, database: all, user: all, address: "127.0.0.1/32", auth_method: md5 }
   - { type: host, database: all, user: all, address: "::1/128", auth_method: md5 }
   - { type: host, database: all, user: all, address: "192.168.56.0/24", auth_method: md5 }
+
+patroni_cluster_name: "postgres-cluster"
+
+environment: "prod"
+
+databases:
+  - name: app
+    owner: user
+  - name: monitoring
+    owner: postgres
+
+users:
+  - name: user
+    password: "{{ vault_app_password }}"
+  - name: readuser
+    password: "{{ vault_read_password }}"
+    privileges: ["LOGIN"]
+
+pgbouncer_databases:
+  - name: myapp
+  - name: monitoring
+
+etcd_client_port: 2379
+etcd_peer_port: 2380
+patroni_restapi_port: 8008
+postgresql_port: 5432
+pgbouncer_port: 6432
+haproxy_frontend_port: 5000
