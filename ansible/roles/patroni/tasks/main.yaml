@@ -2,13 +2,11 @@
 - name: Install patroni-postgresql
   become: true
   ansible.builtin.import_tasks: install.yml
-  tags: patroni-postgres-install
 
 - name: Install pgbouncer
   become: true
   ansible.builtin.import_tasks: pgbouncer-install.yml
   when: with_pgbouncer == true
-  tags: pgbouncer-install
 
 - name: Create databases with role and user in cluster
   bacome: yes
@@ -21,10 +19,8 @@
   become: true
   ansible.builtin.import_tasks: backup.yml
   when: with_backup == true
-  tags: backup-postgres
 
 - name: uninstall cluster
   become: true
   ansible.builtin.import_tasks: uninstall.yml
   when: flash_all == true
-  tags: uninstall
