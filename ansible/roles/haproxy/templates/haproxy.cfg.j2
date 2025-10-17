@@ -1,36 +1,63 @@
 global
     daemon
-    maxconn 10000
+    maxconn {{ haproxy_maxconn }}
+    log 127.0.0.1:{{ haproxy_syslog_port }} local0
+    stats socket /var/run/haproxy/admin.sock mode 660 level admin
+    tune.ssl.default-dh-param 2048
 
 defaults
     log global
     mode tcp
-    retries 2
-    timeout client 30m
-    timeout connect 4s
-    timeout server 30m
-    timeout check 5s
+    option tcplog
+    option dontlognull
+    retries {{ haproxy_retries }}
+    timeout client {{ haproxy_timeout_client }}
+    timeout connect {{ haproxy_timeout_connect }}
+    timeout server {{ haproxy_timeout_server }}
+    timeout check {{ haproxy_timeout_check }}
+    option redispatch
 
-# PostgreSQL read/write
+# Health check for Patroni
+backend patroni_health_check
+    mode http
+    option httpchk
+    http-check expect status 200
+
+# PostgreSQL read/write - primary only
 listen postgres_rw
     bind *:{{ haproxy_frontend_port }}
     mode tcp
     balance first
     option httpchk OPTIONS /master
     http-check expect status 200
+    default-server inter 3s fall 3 rise 2 on-marked-down shutdown-sessions
     {% for host in groups['patroni_cluster'] %}
-    server {{ host }} {{ host }}:{{ postgresql_port }} check port {{ patroni_restapi_port }}
+    server {{ host }} {{ host }}:{{ postgresql_port }} check port {{ patroni_restapi_port }} verify none
     {% endfor %}
 
-# PostgreSQL read-only
+# PostgreSQL read-only - replicas only
 listen postgres_ro
-    bind *:{{ haproxy_frontend_port | int + 1 }}
+    bind *:{{ (haproxy_frontend_port | int) + 1 }}
     mode tcp
     balance roundrobin
     option httpchk OPTIONS /replica
     http-check expect status 200
+    default-server inter 3s fall 3 rise 2 on-marked-down shutdown-sessions
     {% for host in groups['patroni_cluster'] %}
-    server {{ host }} {{ host }}:{{ postgresql_port }} check port {{ patroni_restapi_port }}
+    server {{ host }} {{ host }}:{{ postgresql_port }} check port {{ patroni_restapi_port }} verify none
+    {% endfor %}
+
+# PostgreSQL read/write with connection tracking
+listen postgres_rw_sticky
+    bind *:{{ (haproxy_frontend_port | int) + 2 }}
+    mode tcp
+    balance first
+    option tcp-check
+    tcp-check connect
+    tcp-check send PGBOUNCER\n
+    default-server inter 3s fall 3 rise 2 on-marked-down shutdown-sessions
+    {% for host in groups['patroni_cluster'] %}
+    server {{ host }} {{ host }}:{{ postgresql_port }} check port {{ patroni_restapi_port }} verify none
     {% endfor %}
 
 # HAProxy Statistics
@@ -39,6 +66,8 @@ listen stats
     mode http
     stats enable
     stats hide-version
-    stats realm Haproxy\ Statistics
-    stats uri /
+    stats refresh 30s
+    stats show-node
     stats auth {{ haproxy_stats_user }}:{{ haproxy_stats_password }}
+    stats uri /
+    stats admin if TRUE

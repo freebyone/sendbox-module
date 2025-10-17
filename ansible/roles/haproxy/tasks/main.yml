@@ -1,7 +1,9 @@
+---
 - name: Install HAProxy
   package:
     name: haproxy
     state: present
+  when: ansible_os_family == "Debian" or ansible_os_family == "RedHat"
 
 - name: Create HAProxy configuration directory
   file:
@@ -26,43 +28,55 @@
     regexp: '^ENABLED='
     line: 'ENABLED=1'
     state: present
+  when: ansible_os_family == "Debian"
 
-- name: Configure HAProxy log
-  lineinfile:
-    path: /etc/rsyslog.conf
-    line: '$ModLoad imudp\n$UDPServerRun 514'
-    state: present
-  notify: restart rsyslog
+- name: Configure SELinux for HAProxy
+  selinux_permissive:
+    name: haproxy_t
+    permissive: true
+  when: ansible_os_family == "RedHat" and ansible_selinux.status == "enabled"
 
 - name: Configure HAProxy logging
-  copy:
-    content: |
-      local0.* -/var/log/haproxy.log
-    dest: /etc/rsyslog.d/49-haproxy.conf
-    owner: root
-    group: root
-    mode: '0644'
-  notify: restart rsyslog
+  block:
+    - name: Configure HAProxy log in rsyslog
+      lineinfile:
+        path: /etc/rsyslog.conf
+        line: '$ModLoad imudp\n$UDPServerRun {{ haproxy_syslog_port }}'
+        state: present
+      notify: restart rsyslog
 
-- name: Create HAProxy log file
-  file:
-    path: /var/log/haproxy.log
-    state: touch
-    owner: syslog
-    group: adm
-    mode: '0644'
+    - name: Configure HAProxy logging rules
+      copy:
+        content: |
+          local0.* -/var/log/haproxy.log
+        dest: /etc/rsyslog.d/49-haproxy.conf
+        owner: root
+        group: root
+        mode: '0644'
+      notify: restart rsyslog
+
+    - name: Create HAProxy log file
+      file:
+        path: /var/log/haproxy.log
+        state: touch
+        owner: syslog
+        group: adm
+        mode: '0644'
+  when: haproxy_log_enabled
 
 - name: Start and enable HAProxy
   systemd:
     name: haproxy
     state: started
     enabled: true
+    daemon_reload: true
 
 - name: Wait for HAProxy to start
   wait_for:
     port: "{{ haproxy_frontend_port }}"
     host: "{{ inventory_hostname }}"
     delay: 5
+    timeout: 30
     state: started
 
 - name: Wait for HAProxy stats
@@ -70,6 +84,7 @@
     port: "{{ haproxy_stats_port }}"
     host: "{{ inventory_hostname }}"
     delay: 5
+    timeout: 30
     state: started
 
 - name: Test HAProxy stats page
@@ -80,8 +95,11 @@
     password: "{{ haproxy_stats_password }}"
     force_basic_auth: true
     status_code: 200
+    timeout: 10
   register: haproxy_test
   failed_when: haproxy_test.failed
+  retries: 3
+  delay: 5
 
 - name: Check PostgreSQL backend status
   uri:
@@ -90,9 +108,10 @@
     user: "{{ haproxy_stats_user }}"
     password: "{{ haproxy_stats_password }}"
     force_basic_auth: true
+    timeout: 10
   register: haproxy_stats
   failed_when: false
 
 - name: Display HAProxy status
   debug:
-    msg: "HAProxy is running and configured with {{ haproxy_stats.content | length }} backends"
+    msg: "HAProxy is running and configured. Stats available at http://{{ inventory_hostname }}:{{ haproxy_stats_port }}/"

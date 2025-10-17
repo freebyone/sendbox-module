@@ -1,7 +1,20 @@
+---
+# HAProxy configuration
 haproxy_frontend_port: 5000
 haproxy_stats_port: 1936
 haproxy_stats_user: "admin"
 haproxy_stats_password: "admin"
 
+haproxy_maxconn: 10000
+haproxy_timeout_client: "30m"
+haproxy_timeout_server: "30m"
+haproxy_timeout_connect: "4s"
+haproxy_timeout_check: "5s"
+haproxy_retries: 2
+
+haproxy_log_enabled: true
+haproxy_syslog_port: 514
+
+# PostgreSQL and Patroni
 postgresql_port: 5432
 patroni_restapi_port: 8008
