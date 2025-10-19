@@ -11,6 +11,11 @@ Vagrant.configure("2") do |config|
     jump_config.vm.network "forwarded_port", guest: 22, host: 2210, auto_correct: true
     jump_config.vm.network "private_network", ip: "192.168.56.100", virtualbox__intnet: "cluster-network"
     
+    jump_config.vm.synced_folder "./ansible", "/home/vagrant/ansible", 
+      type: "rsync",
+      rsync__auto: true,
+      rsync__exclude: [".git/", ".vagrant/", "*.retry", "*.tmp"]
+
     jump_config.vm.provider "virtualbox" do |vb|
       vb.name = "jump-host"
       vb.memory = 1024

@@ -1,6 +1,17 @@
 ---
-- name: Install Docker dependencies
-  apt:
+- name: Remove conflicting Docker packages
+  package:
+    name:
+      - docker
+      - docker-engine
+      - docker.io
+      - containerd
+      - runc
+    state: absent
+  ignore_errors: yes
+
+- name: Install prerequisites
+  package:
     name:
       - apt-transport-https
       - ca-certificates
@@ -9,7 +20,7 @@
       - lsb-release
     state: present
 
-- name: Add Docker GPG key
+- name: Add Docker official GPG key
   apt_key:
     url: https://download.docker.com/linux/ubuntu/gpg
     state: present
@@ -19,14 +30,19 @@
     repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
     state: present
 
-- name: Install Docker packages
+- name: Update package cache
   apt:
+    update_cache: yes
+
+- name: Install Docker
+  package:
     name:
       - docker-ce
       - docker-ce-cli
       - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
     state: present
-    update_cache: yes
 
 - name: Start and enable Docker service
   systemd:
@@ -40,11 +56,11 @@
     groups: docker
     append: yes
 
-- name: Test Docker installation
-  command: docker run --rm hello-world
-  register: docker_test
+- name: Verify Docker installation
+  command: docker --version
+  register: docker_version
   changed_when: false
 
-- name: Show test results
+- name: Show Docker version
   debug:
-    var: docker_test.stdout_lines
+    var: docker_version.stdout

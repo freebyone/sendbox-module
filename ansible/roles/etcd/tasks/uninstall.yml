@@ -1,0 +1,41 @@
+---
+- name: Stop and disable etcd service
+  systemd:
+    name: 
+    state: stopped
+    enabled: no
+
+- name: Remove etcd systemd service
+  file:
+    path: /etc/systemd/system/{{ etcd_cluster }}.service
+    state: absent
+
+- name: Remove etcd container
+  shell: |
+    docker stop {{ etcd_cluster }} || true
+    docker rm {{ etcd_cluster }} || true
+  ignore_errors: yes
+
+- name: Remove etcd Docker image
+  docker_image:
+    name: "{{ etcd_docker_image }}"
+    state: absent
+
+- name: Remove etcd data directory
+  file:
+    path: "{{ etcd_data_dir }}"
+    state: absent
+
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: yes
+
+- name: Remove Docker (optional)
+  package:
+    name: docker.io
+    state: absent
+  when: remove_docker | default(false)
+
+- name: Confirm cleanup
+  debug:
+    msg: "etcd has been completely removed from {{ inventory_hostname }}"

@@ -1,0 +1,53 @@
+---
+- name: Create etcd data directory
+  file:
+    path: "{{ etcd_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Pull etcd Docker image
+  docker_image:
+    name: "{{ etcd_docker_image }}"
+    source: pull
+
+- name: Create etcd systemd service
+  template:
+    src: etcd-docker.service.j2
+    dest: /etc/systemd/system/etcd.service
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: yes
+
+- name: Start and enable etcd service
+  systemd:
+    name: etcd
+    state: started
+    enabled: yes
+
+- name: Wait for etcd to start
+  wait_for:
+    port: "{{ etcd_client_port }}"
+    host: "0.0.0.0"
+    delay: 5
+    timeout: 30
+
+- name: Check etcd cluster health
+  shell: |
+    docker exec etcd /usr/local/bin/etcdctl endpoint health --cluster
+  environment:
+    ETCDCTL_API: "3"
+  register: etcd_health
+  until: etcd_health.rc == 0
+  retries: 10
+  delay: 5
+  ignore_errors: true
+
+- name: Show etcd health status
+  debug:
+    msg: "{{ etcd_health.stdout }}"

@@ -1,12 +1,19 @@
-etcd_version: "3.5"
-etcd_cluster_name: "etcd-cluster"
+---
+etcd_version: "3.5.13"
 etcd_data_dir: "/var/lib/etcd"
+etcd_cluster_token: "etcd-cluster-1"
+etcd_cluster: etcd-postgres
+
+# Docker настройки
+etcd_docker_image: "quay.io/coreos/etcd:v{{ etcd_version }}"
 etcd_client_port: 2379
 etcd_peer_port: 2380
 
-etcd_initial_cluster: "{{ groups['etcd_cluster'] | map('extract', hostvars, ['etcd_node_name']) | list | join(',') }}"
+# Настройки кластера - ФИКСИРОВАННЫЕ IP
+etcd_initial_cluster: "node1=http://192.168.56.10:2380,node2=http://192.168.56.11:2380,node3=http://192.168.56.12:2380"
 
-etcd_auto_compaction_mode: "revision"
-etcd_auto_compaction_retention: "1000"
-
-etcd_systemd_restart: "always"
+# IP адреса для каждой ноды
+etcd_node_ips:
+  node1: "192.168.56.10"
+  node2: "192.168.56.11" 
+  node3: "192.168.56.12"

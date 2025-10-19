@@ -23,7 +23,7 @@
 
 - name: Deploy Patroni container
   community.docker.docker_container:
-    name: {{ cluster_name }}
+    name: {{ patroni_cluster_name }}
     image: "{{ patroni_docker_image }}"
     state: started
     restart_policy: "{{ docker_restart_policy }}"
