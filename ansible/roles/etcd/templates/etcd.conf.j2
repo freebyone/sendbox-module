@@ -1,14 +1,18 @@
 # Node configuration
-ETCD_NAME={{ inventory_hostname }}
+ETCD_NAME={{ etcd_node_name | default(inventory_hostname) }}
 ETCD_DATA_DIR={{ etcd_data_dir }}
 
 # Cluster configuration
-ETCD_INITIAL_CLUSTER_STATE=new
+ETCD_INITIAL_CLUSTER_STATE={{ etcd_initial_cluster_state | default('new') }}
 ETCD_INITIAL_CLUSTER_TOKEN={{ etcd_cluster_name }}
 ETCD_INITIAL_CLUSTER={{ etcd_initial_cluster }}
 
 # Listener configuration
-ETCD_LISTEN_PEER_URLS=http://0.0.0.0:{{ etcd_peer_port }}
-ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:{{ etcd_client_port }}
+ETCD_LISTEN_PEER_URLS=http://{{ ansible_default_ipv4.address }}:{{ etcd_peer_port }}
+ETCD_LISTEN_CLIENT_URLS=http://{{ ansible_default_ipv4.address }}:{{ etcd_client_port }},http://127.0.0.1:{{ etcd_client_port }}
 ETCD_ADVERTISE_CLIENT_URLS=http://{{ inventory_hostname }}:{{ etcd_client_port }}
 ETCD_INITIAL_ADVERTISE_PEER_URLS=http://{{ inventory_hostname }}:{{ etcd_peer_port }}
+
+# Other settings
+ETCD_AUTO_COMPACTION_MODE={{ etcd_auto_compaction_mode }}
+ETCD_AUTO_COMPACTION_RETENTION={{ etcd_auto_compaction_retention }}

@@ -12,14 +12,14 @@ ExecStart=/usr/bin/docker run \
   --name {{ etcd_cluster }} \
   --network host \
   --volume {{ etcd_data_dir }}:/etcd-data \
-  quay.io/coreos/etcd:v{{ etcd_version }} \
-  /usr/local/bin/{{ etcd_cluster }} \
+  {{ etcd_docker_image }} \
+  /usr/local/bin/etcd \
   --name {{ inventory_hostname }} \
-  --data-dir /{{ etcd_cluster }}-data \
+  --data-dir /etcd-data \
   --listen-client-urls http://0.0.0.0:{{ etcd_client_port }} \
-  --advertise-client-urls http://{{ etcd_node_ips[inventory_hostname] }}:{{ etcd_client_port }} \
+  --advertise-client-urls http://{{ inventory_hostname }}:{{ etcd_client_port }} \
   --listen-peer-urls http://0.0.0.0:{{ etcd_peer_port }} \
-  --initial-advertise-peer-urls http://{{ etcd_node_ips[inventory_hostname] }}:{{ etcd_peer_port }} \
+  --initial-advertise-peer-urls http://{{ inventory_hostname }}:{{ etcd_peer_port }} \
   --initial-cluster {{ etcd_initial_cluster }} \
   --initial-cluster-token {{ etcd_cluster_token }} \
   --initial-cluster-state new
