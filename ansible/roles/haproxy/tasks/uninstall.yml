@@ -1,0 +1,37 @@
+---
+- name: Stop and remove HAProxy container
+  community.docker.docker_container:
+    name: "{{ haproxy_container_name }}"
+    state: absent
+    force_kill: true
+    stop_timeout: 30
+
+- name: Remove HAProxy Docker image
+  community.docker.docker_image:
+    name: "{{ haproxy_docker_image }}"
+    tag: "{{ haproxy_docker_tag }}"
+    state: absent
+  when: haproxy_remove_image | bool
+
+- name: Clean up HAProxy directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ haproxy_config_dir }}"
+    - "{{ haproxy_data_dir }}"
+  when: haproxy_cleanup_dirs | bool
+
+- name: Remove Docker (optional)
+  ansible.builtin.include_tasks: uninstall_docker.yml
+  when: haproxy_remove_docker | bool
+
+- name: Display uninstallation summary
+  ansible.builtin.debug:
+    msg: |
+      HAProxy container successfully removed!
+      ======================================
+      Removed container: {{ haproxy_container_name }}
+      Removed image: {{ haproxy_docker_image }}:{{ haproxy_docker_tag }}
+      Cleaned directories: {{ haproxy_cleanup_dirs | bool }}
+      Removed Docker: {{ haproxy_remove_docker | bool }}

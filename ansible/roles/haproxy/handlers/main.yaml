@@ -1,12 +1,12 @@
 ---
-- name: restart haproxy
-  systemd:
-    name: haproxy
+- name: restart haproxy container
+  community.docker.docker_container:
+    name: "{{ haproxy_container_name }}"
     state: restarted
-    enabled: true
-    daemon_reload: true
+    stop_timeout: 30
 
-- name: restart rsyslog
-  systemd:
-    name: rsyslog
-    state: restarted
+- name: reload haproxy configuration
+  community.docker.docker_container_exec:
+    container: "{{ haproxy_container_name }}"
+    command: haproxy -f /usr/local/etc/haproxy/haproxy.cfg -sf $(pidof haproxy)
+    detach: false
