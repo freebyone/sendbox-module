@@ -18,7 +18,10 @@ with_pgbouncer: "false"
 # Management
 create_db: "false"
 
-# DB and userlist 
+# DB and userlist
+postgres_admin_users: admin_user
+monitoring_user: stats_user
+
 postgresql_parameters:
   max_connections: "100"
   shared_buffers: "1GB"

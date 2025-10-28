@@ -11,5 +11,5 @@ auth_file = /etc/pgbouncer/userlist.txt
 pool_mode = {{ pgbouncer_pool_mode }}
 max_client_conn = {{ pgbouncer_max_client_conn }}
 default_pool_size = {{ pgbouncer_default_pool_size }}
-admin_users = postgres
-stats_users = stats_user
+admin_users = {{ postgres_admin_users }}
+stats_users = {{ monitoring_user }}
