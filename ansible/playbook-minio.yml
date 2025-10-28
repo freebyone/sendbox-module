@@ -1,0 +1,38 @@
+---
+- name: Deploy MinIO cluster
+  hosts: minio_servers
+  become: yes
+  vars:
+    minio_server_scheme: http
+    minio_server_port: 9000
+    minio_console_port: 9001
+    minio_server_datadirs:
+      - /data/minio
+    minio_access_key: "your-secure-access-key"
+    minio_secret_key: "your-very-secure-secret-key"
+    minio_distributed: true
+    minio_server_zone: "zone1"
+    
+    minio_server_nodes: "{{ groups['minio_servers'] | map('regex_replace', '^(.*)$', 'http://\\1:9000' + (minio_server_datadirs | first)) | list }}"
+  
+  pre_tasks:
+    - name: Ensure data directory exists
+      file:
+        path: "{{ minio_server_datadirs | first }}"
+        state: directory
+        owner: "{{ minio_user | default('minio') }}"
+        group: "{{ minio_group | default('minio') }}"
+        mode: '0755'
+  
+  roles:
+    - role: ansible-minio
+      tags: minio
+  
+  post_tasks:
+    - name: Wait for MinIO service to start
+      wait_for:
+        port: "{{ minio_server_port }}"
+        host: "{{ inventory_hostname }}"
+        delay: 10
+        timeout: 60
+      delegate_to: "{{ inventory_hostname }}"
