@@ -1,0 +1,12 @@
+minio_server_scheme: http
+minio_server_port: 9000
+minio_console_port: 9001
+minio_server_datadirs:
+  - /data/minio
+
+minio_access_key: "your-secure-access-key"
+minio_secret_key: "your-very-secure-secret-key"
+minio_distributed: true
+minio_server_zone: "zone1"
+
+minio_server_nodes: "{{ groups['minio_servers'] | map('regex_replace', '^(.*)$', 'http://\\1:9000' + (minio_server_datadirs | first)) | list }}"
