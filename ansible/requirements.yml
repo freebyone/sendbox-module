@@ -7,3 +7,13 @@
   src: https://github.com/nginx/ansible-role-nginx
   version: main
   scm: git
+
+- name: ansible-victoriametrics-cluster-role
+  src: https://github.com/Slapper/ansible-victoriametrics-cluster-role
+  version: master
+  scm: git
+
+- name: grafana-ansible-collection
+  src: https://github.com/grafana/grafana-ansible-collection
+  version: main
+  scm: git

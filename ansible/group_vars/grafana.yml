@@ -1,0 +1,102 @@
+---
+# Grafana installation
+grafana_version: "12.2.0"
+grafana_edition: "oss"  # or "enterprise"
+
+# Grafana server configuration
+grafana_server:
+  http_port: 3000
+  domain: "{{ inventory_hostname }}"
+  root_url: "http://{{ inventory_hostname }}:3000"
+  enable_gzip: true
+  protocol: http
+
+# Database configuration (using SQLite for simplicity)
+grafana_database:
+  type: sqlite3
+  path: "/var/lib/grafana/grafana.db"
+
+# Security configuration
+grafana_security:
+  admin_user: "admin"
+  admin_password: "{{ grafana_admin_password }}"
+  secret_key: "{{ grafana_secret_key }}"
+
+# Session configuration
+grafana_session:
+  provider: file
+  provider_config: "sessions"
+
+# Logging configuration
+grafana_log:
+  mode: "file"
+  level: "info"
+  format: "text"
+
+# Grafana paths
+grafana_paths:
+  data: "/var/lib/grafana"
+  logs: "/var/log/grafana"
+  plugins: "/var/lib/grafana/plugins"
+  provisioning: "/etc/grafana/provisioning"
+
+# Datasources provisioning
+grafana_provisioning_datasources:
+  - name: 'VictoriaMetrics'
+    type: 'prometheus'
+    access: 'proxy'
+    url: 'http://localhost:8428'
+    is_default: true
+    editable: true
+
+# Dashboards provisioning
+grafana_provisioning_dashboards:
+  - name: 'default'
+    org_id: 1
+    folder: 'General'
+    type: 'file'
+    options:
+      path: '/etc/grafana/provisioning/dashboards'
+
+# Plugins to install
+grafana_plugins:
+  - name: grafana-clock-panel
+    version: latest
+  - name: grafana-piechart-panel  
+    version: latest
+
+# Users and organizations
+grafana_users:
+  allow_sign_up: false
+  auto_assign_org: true
+  auto_assign_org_role: "Viewer"
+
+grafana_organizations:
+  - name: "Main Org."
+    id: 1
+
+# SMTP configuration (optional)
+# grafana_smtp:
+#   enabled: true
+#   host: "localhost:25"
+#   from_address: "grafana@localhost"
+
+# Systemd service configuration
+grafana_service:
+  name: grafana-server
+  state: started
+  enabled: true
+
+# Firewall configuration
+grafana_firewall_configure: true
+grafana_ports:
+  - "3000"
+
+# Package management
+grafana_use_repository: true
+grafana_repository_key: "https://packages.grafana.com/gpg.key"
+grafana_repository_url: "https://packages.grafana.com/oss/deb"
+
+# Secret variables (should be in vault or separate secure file)
+grafana_admin_password: "admin123"  # Change this in production!
+grafana_secret_key: "SW2YcwTIb9zpOOhoPsMm"

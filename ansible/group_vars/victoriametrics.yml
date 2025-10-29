@@ -1,0 +1,64 @@
+---
+victoriametrics_version: "v1.93.4"
+
+victoriametrics_cluster_mode: true
+vm_cluster_replication_factor: 2
+
+vmstorage_enabled: true
+vmstorage_listen_address: ":8482"
+vmstorage_data_path: "/data/victoriametrics/storage"
+vmstorage_retention_period: "12"
+
+vmselect_enabled: true
+vmselect_listen_address: ":8481"
+vmselect_cache_data_path: "/data/victoriametrics/select-cache"
+
+vminsert_enabled: true
+vminsert_listen_address: ":8480"
+
+vm_cluster_nodes:
+  vmstorage:
+    - "node1:8482"
+    - "node2:8482" 
+    - "node3:8482"
+  vmselect:
+    - "node1:8481"
+    - "node2:8481"
+    - "node3:8481"
+  vminsert:
+    - "node1:8480"
+    - "node2:8480"
+    - "node3:8480"
+
+vmstorage_flags:
+  - "retentionPeriod={{ vmstorage_retention_period }}"
+  - "storageDataPath={{ vmstorage_data_path }}"
+
+vmselect_flags:
+  - "cacheDataPath={{ vmselect_cache_data_path }}"
+  - "dedup.minScrapeInterval=30s"
+
+vminsert_flags:
+  - "maxConcurrentInserts=32"
+  - "maxInsertRequestSize=33554432"
+
+victoriametrics_user: "victoriametrics"
+victoriametrics_group: "victoriametrics"
+
+victoriametrics_systemd_configure: true
+victoriametrics_manage_services: true
+
+victoriametrics_firewall_configure: true
+victoriametrics_ports:
+  - "8480"
+  - "8481" 
+  - "8482"
+  - "8428"
+
+victoriametrics_systemd_limits:
+  LimitNOFILE: 65536
+  LimitNPROC: 65536
+
+victoriametrics_directories:
+  - "{{ vmstorage_data_path }}"
+  - "{{ vmselect_cache_data_path }}"

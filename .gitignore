@@ -2,3 +2,5 @@
 .vscode
 shared
 jump-host-key.pub
+./shared-roles
+./shared

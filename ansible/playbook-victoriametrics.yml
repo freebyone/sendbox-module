@@ -1,0 +1,31 @@
+---
+- name: Deploy VictoriaMetrics cluster
+  hosts: cluster
+  become: yes
+  vars_files:
+    - "group_vars/victoriametrics.yml"
+  
+  roles:
+    - role: ansible-victoriametrics-cluster-role
+      
+  tasks:
+    - name: Wait for VictoriaMetrics services to start
+      wait_for:
+        port: "{{ item }}"
+        host: "{{ inventory_hostname }}"
+        delay: 5
+        timeout: 60
+      loop: "{{ victoriametrics_ports }}"
+      when: victoriametrics_systemd_configure | bool
+      
+    - name: Check VictoriaMetrics health
+      uri:
+        url: "http://{{ inventory_hostname }}:8428/health"
+        method: GET
+        status_code: 200
+        timeout: 10
+      register: health_check
+      until: health_check.status == 200
+      retries: 5
+      delay: 10
+      ignore_errors: yes
