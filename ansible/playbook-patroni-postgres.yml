@@ -13,13 +13,6 @@
     - patroni
   tags: patroni
 
-- name: Deploy PgBouncer poolers
-  hosts: pgbouncer_servers
-  become: true
-  roles:
-    - pgbouncer
-  tags: pgbouncer
-
 - name: Deploy HAProxy load balancers
   hosts: haproxy_servers
   become: true

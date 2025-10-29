@@ -5,13 +5,15 @@ After=docker.service
 Requires=docker.service
 
 [Service]
-Type=notify
+Type=simple
 ExecStartPre=-/usr/bin/docker stop {{ etcd_cluster }}
 ExecStartPre=-/usr/bin/docker rm {{ etcd_cluster }}
 ExecStart=/usr/bin/docker run \
   --name {{ etcd_cluster }} \
   --network host \
   --volume {{ etcd_data_dir }}:/etcd-data \
+  --log-driver=journald \
+  --log-opt tag="{{ etcd_cluster }}" \
   {{ etcd_docker_image }} \
   /usr/local/bin/etcd \
   --name {{ inventory_hostname }} \
@@ -22,13 +24,20 @@ ExecStart=/usr/bin/docker run \
   --initial-advertise-peer-urls http://{{ inventory_hostname }}:{{ etcd_peer_port }} \
   --initial-cluster {{ etcd_initial_cluster }} \
   --initial-cluster-token {{ etcd_cluster_token }} \
-  --initial-cluster-state new
+  --initial-cluster-state new \
+  --heartbeat-interval=500 \
+  --election-timeout=5000
 ExecStop=/usr/bin/docker stop {{ etcd_cluster }}
 ExecStopPost=-/usr/bin/docker rm {{ etcd_cluster }}
 Restart=always
 RestartSec=10
-TimeoutStartSec=120
-TimeoutStopSec=30
+# Для simple типа отключаем таймаут старта
+TimeoutStartSec=0
+TimeoutStopSec=60
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier={{ etcd_cluster }}
 
 [Install]
 WantedBy=multi-user.target
