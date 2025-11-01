@@ -9,18 +9,17 @@
   when: with_pgbouncer == true
 
 - name: Create databases with role and user in cluster
-  bacome: yes
+  become: true
   ansible.builtin.import_tasks: management.yml
   when: (create_db == true) and not (new_cluster == true)
   tags: management-postgres
-
 
 - name: Backup postgres data
   become: true
   ansible.builtin.import_tasks: backup.yml
   when: with_backup == true
 
-- name: uninstall cluster
-  become: true
-  ansible.builtin.import_tasks: uninstall.yml
-  when: flash_all == true
+# - name: uninstall cluster
+#   become: true
+#   ansible.builtin.import_tasks: uninstall.yml
+#   when: flash_all == true

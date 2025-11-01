@@ -3,7 +3,6 @@ global
     maxconn {{ haproxy_maxconn }}
     log stdout format raw local0 info
     stats socket /var/run/haproxy/admin.sock mode 660 level admin
-    tune.ssl.default-dh-param 2048
 
 defaults
     log global
@@ -17,38 +16,14 @@ defaults
     timeout check {{ haproxy_timeout_check }}
     option redispatch
 
-listen postgres_rw
+# Minimal test configuration
+listen test_postgres
     bind *:{{ haproxy_frontend_port }}
     mode tcp
-    balance first
-    option httpchk OPTIONS /master
-    http-check expect status 200
-    default-server inter 3s fall 3 rise 2 on-marked-down shutdown-sessions
-    {% for host in groups['patroni_cluster'] %}
-    server {{ host }} {{ hostvars[host].ansible_host | default(host) }}:{{ postgresql_port }} check port {{ patroni_restapi_port }} verify none
-    {% endfor %}
-
-listen postgres_ro
-    bind *:{{ haproxy_readonly_port }}
-    mode tcp
     balance roundrobin
-    option httpchk OPTIONS /replica
-    http-check expect status 200
-    default-server inter 3s fall 3 rise 2 on-marked-down shutdown-sessions
-    {% for host in groups['patroni_cluster'] %}
-    server {{ host }} {{ hostvars[host].ansible_host | default(host) }}:{{ postgresql_port }} check port {{ patroni_restapi_port }} verify none
-    {% endfor %}
-
-listen postgres_rw_sticky
-    bind *:{{ haproxy_sticky_port }}
-    mode tcp
-    balance first
     option tcp-check
-    tcp-check connect
-    tcp-check send PGBOUNCER\n
-    default-server inter 3s fall 3 rise 2 on-marked-down shutdown-sessions
     {% for host in groups['patroni_cluster'] %}
-    server {{ host }} {{ hostvars[host].ansible_host | default(host) }}:{{ postgresql_port }} check port {{ patroni_restapi_port }} verify none
+    server {{ host }} {{ hostvars[host].ansible_host | default(host) }}:{{ postgresql_port }} check port {{ postgresql_port }}
     {% endfor %}
 
 listen stats

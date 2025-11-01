@@ -1,12 +1,20 @@
 ---
-- name: restart haproxy container
-  community.docker.docker_container:
+- name: reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: restart haproxy service
+  ansible.builtin.systemd:
     name: "{{ haproxy_container_name }}"
     state: restarted
-    stop_timeout: 30
+
+- name: reload haproxy service
+  ansible.builtin.systemd:
+    name: "{{ haproxy_container_name }}"
+    state: reloaded
 
 - name: reload haproxy configuration
-  community.docker.docker_container_exec:
-    container: "{{ haproxy_container_name }}"
-    command: haproxy -f /usr/local/etc/haproxy/haproxy.cfg -sf $(pidof haproxy)
-    detach: false
+  ansible.builtin.shell:
+    cmd: "docker exec {{ haproxy_container_name }} haproxy -f /usr/local/etc/haproxy/haproxy.cfg -sf $(pidof haproxy)"
+  args:
+    executable: /bin/bash

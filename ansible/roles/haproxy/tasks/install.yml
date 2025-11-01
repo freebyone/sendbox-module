@@ -4,12 +4,6 @@
     manager: auto
   register: pkg_info
 
-- name: Install Docker dependencies
-  ansible.builtin.include_tasks: install_docker.yml
-  when: 
-    - "'docker' not in pkg_info.packages"
-    - haproxy_install_docker | bool
-
 - name: Create HAProxy directories
   ansible.builtin.file:
     path: "{{ item }}"
@@ -19,7 +13,7 @@
     mode: '0755'
   loop:
     - "{{ haproxy_config_dir }}"
-    - "{{ haproxy_data_dir }}"
+    - "/etc/systemd/system"
 
 - name: Create HAProxy configuration
   ansible.builtin.template:
@@ -28,54 +22,38 @@
     owner: root
     group: root
     mode: '0644'
-  notify: restart haproxy container
+  notify: reload haproxy service
 
 - name: Pull HAProxy Docker image
-  community.docker.docker_image:
-    name: "{{ haproxy_docker_image }}"
-    tag: "{{ haproxy_docker_tag }}"
-    source: pull
-    force_source: "{{ haproxy_force_pull }}"
-    state: present
+  ansible.builtin.shell:
+    cmd: "docker pull {{ haproxy_docker_image }}:{{ haproxy_docker_tag }}"
+  args:
+    executable: /bin/bash
+  register: pull_result
+  changed_when: "'Downloaded newer image' in pull_result.stdout or 'Image is up to date' not in pull_result.stdout"
 
-- name: Create HAProxy Docker container
-  community.docker.docker_container:
+- name: Create HAProxy systemd service
+  ansible.builtin.template:
+    src: haproxy.service.j2
+    dest: /etc/systemd/system/{{ haproxy_container_name }}.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: reload systemd
+
+- name: Enable and start HAProxy service
+  ansible.builtin.systemd:
     name: "{{ haproxy_container_name }}"
-    image: "{{ haproxy_docker_image }}:{{ haproxy_docker_tag }}"
     state: started
-    restart_policy: "{{ haproxy_restart_policy }}"
-    network_mode: "{{ haproxy_network_mode }}"
-    ports:
-      - "{{ haproxy_frontend_port }}:{{ haproxy_frontend_port }}"
-      - "{{ haproxy_readonly_port }}:{{ haproxy_readonly_port }}"
-      - "{{ haproxy_sticky_port }}:{{ haproxy_sticky_port }}"
-      - "{{ haproxy_stats_port }}:{{ haproxy_stats_port }}"
-    volumes:
-      - "{{ haproxy_config_dir }}/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro"
-    env:
-      HAPROXY_STATS_PORT: "{{ haproxy_stats_port }}"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:{{ haproxy_stats_port }}/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    labels:
-      description: "HAProxy for PgBouncer proxying"
-      version: "{{ haproxy_docker_tag }}"
+    enabled: true
+    daemon_reload: true
 
-- name: Wait for HAProxy container to be healthy
+- name: Wait for HAProxy service to start
   ansible.builtin.wait_for:
-    path: "{{ haproxy_data_dir }}/healthcheck"
-    state: present
-    timeout: 60
-  async: 60
-  poll: 5
-
-- name: Check HAProxy container status
-  community.docker.docker_container_info:
-    name: "{{ haproxy_container_name }}"
-  register: container_info
+    port: "{{ haproxy_stats_port }}"
+    host: "{{ inventory_hostname }}"
+    state: started
+    timeout: 30
 
 - name: Verify HAProxy stats endpoint
   ansible.builtin.uri:
@@ -91,26 +69,24 @@
   retries: 5
   delay: 5
 
-- name: Get backend status
-  ansible.builtin.uri:
-    url: "http://{{ inventory_hostname }}:{{ haproxy_stats_port }}/;csv"
-    method: GET
-    user: "{{ haproxy_stats_user }}"
-    password: "{{ haproxy_stats_password }}"
-    force_basic_auth: true
-    timeout: 10
-  register: backend_status
-  failed_when: false
+- name: Get HAProxy service status
+  ansible.builtin.systemd:
+    name: "{{ haproxy_container_name }}"
+  register: service_status
+
+- name: Check HAProxy container status
+  ansible.builtin.shell:
+    cmd: "docker ps -f name={{ haproxy_container_name }} --format 'table {{.Names}}\t{{.Status}}'"
+  register: container_info
 
 - name: Display installation summary
   ansible.builtin.debug:
     msg: |
-      HAProxy container successfully deployed!
-      ========================================
-      Container: {{ haproxy_container_name }}
+      HAProxy service successfully deployed!
+      =====================================
+      Service: {{ haproxy_container_name }}
       Image: {{ haproxy_docker_image }}:{{ haproxy_docker_tag }}
-      Status: {{ container_info.container.State.Status }}
-      Health: {{ container_info.container.State.Health.Status }}
+      Service Status: {{ service_status.state }}
       
       Access Points:
       - Read/Write: {{ inventory_hostname }}:{{ haproxy_frontend_port }}
@@ -118,4 +94,7 @@
       - Sticky Sessions: {{ inventory_hostname }}:{{ haproxy_sticky_port }}
       - Statistics: http://{{ inventory_hostname }}:{{ haproxy_stats_port }}/
       
-      Backend Status: {{ backend_status.status }}
+      Management commands:
+      - View logs: journalctl -u {{ haproxy_container_name }} -f
+      - Restart: systemctl restart {{ haproxy_container_name }}
+      - Status: systemctl status {{ haproxy_container_name }}

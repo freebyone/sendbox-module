@@ -34,3 +34,4 @@ haproxy_retries: 2
 # Backend configuration
 postgresql_port: 5432
 patroni_restapi_port: 8008
+patroni_cluster_name: "patroni-postgres-cluster"
