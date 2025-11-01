@@ -14,6 +14,7 @@
   loop:
     - "{{ haproxy_config_dir }}"
     - "/etc/systemd/system"
+    - "/tmp/haproxy"
 
 - name: Create HAProxy configuration
   ansible.builtin.template:
@@ -22,7 +23,13 @@
     owner: root
     group: root
     mode: '0644'
-  notify: reload haproxy service
+  notify: restart haproxy service
+
+- name: Ensure config file ends with newline
+  ansible.builtin.lineinfile:
+    path: "{{ haproxy_config_dir }}/haproxy.cfg"
+    line: " "
+    state: present
 
 - name: Pull HAProxy Docker image
   ansible.builtin.shell:
@@ -65,9 +72,6 @@
     status_code: 200
     timeout: 10
   register: haproxy_stats_test
-  until: haproxy_stats_test.status == 200
-  retries: 5
-  delay: 5
 
 - name: Get HAProxy service status
   ansible.builtin.systemd:
@@ -76,8 +80,14 @@
 
 - name: Check HAProxy container status
   ansible.builtin.shell:
-    cmd: "docker ps -f name={{ haproxy_container_name }} --format 'table {{.Names}}\t{{.Status}}'"
+    cmd: "docker ps -f name={{ haproxy_container_name }}"
+  args:
+    executable: /bin/bash
   register: container_info
+
+- name: Display container status
+  ansible.builtin.debug:
+    var: container_info.stdout
 
 - name: Display installation summary
   ansible.builtin.debug:
@@ -86,7 +96,7 @@
       =====================================
       Service: {{ haproxy_container_name }}
       Image: {{ haproxy_docker_image }}:{{ haproxy_docker_tag }}
-      Service Status: {{ service_status.state }}
+      Container Status: {{ container_info.stdout | default('Unknown') }}
       
       Access Points:
       - Read/Write: {{ inventory_hostname }}:{{ haproxy_frontend_port }}

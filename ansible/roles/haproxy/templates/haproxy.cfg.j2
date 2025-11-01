@@ -2,7 +2,8 @@ global
     daemon
     maxconn {{ haproxy_maxconn }}
     log stdout format raw local0 info
-    stats socket /var/run/haproxy/admin.sock mode 660 level admin
+    # Убираем проблемный socket или исправляем путь
+    stats socket /tmp/haproxy-admin.sock mode 660 level admin
 
 defaults
     log global
@@ -16,15 +17,27 @@ defaults
     timeout check {{ haproxy_timeout_check }}
     option redispatch
 
-# Minimal test configuration
-listen test_postgres
+listen postgres_rw
     bind *:{{ haproxy_frontend_port }}
     mode tcp
+    balance first
+    option httpchk OPTIONS /master
+    http-check expect status 200
+    default-server inter 3s fall 3 rise 2 on-marked-down shutdown-sessions
+{% for host in groups['patroni_cluster'] %}
+    server {{ host }} {{ hostvars[host].ansible_host | default(host) }}:{{ postgresql_port }} check port {{ patroni_restapi_port }}
+{% endfor %}
+
+listen postgres_ro
+    bind *:{{ haproxy_readonly_port }}
+    mode tcp
     balance roundrobin
-    option tcp-check
-    {% for host in groups['patroni_cluster'] %}
-    server {{ host }} {{ hostvars[host].ansible_host | default(host) }}:{{ postgresql_port }} check port {{ postgresql_port }}
-    {% endfor %}
+    option httpchk OPTIONS /replica
+    http-check expect status 200
+    default-server inter 3s fall 3 rise 2 on-marked-down shutdown-sessions
+{% for host in groups['patroni_cluster'] %}
+    server {{ host }} {{ hostvars[host].ansible_host | default(host) }}:{{ postgresql_port }} check port {{ patroni_restapi_port }}
+{% endfor %}
 
 listen stats
     bind *:{{ haproxy_stats_port }}

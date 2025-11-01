@@ -5,7 +5,7 @@ haproxy_docker_image: "haproxy"
 haproxy_docker_tag: "2.8-alpine"
 haproxy_container_name: "haproxy-pgbouncer-proxy"
 haproxy_restart_policy: "unless-stopped"
-haproxy_network_mode: "host"  # host|bridge
+haproxy_network_mode: "bridge"
 haproxy_force_pull: false
 
 haproxy_install_docker: true
