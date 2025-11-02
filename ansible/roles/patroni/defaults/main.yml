@@ -16,7 +16,8 @@ with_pgbouncer: "false"
 
 # Management
 create_db: "false"
-replication_password: ""
+replication_password: "admin"
+postgres_superuser_password: "admin"
 # DB and userlist
 postgres_admin_users: admin_user
 monitoring_user: stats_user

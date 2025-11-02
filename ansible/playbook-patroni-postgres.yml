@@ -19,6 +19,8 @@
   roles:
     - haproxy
   tags: haproxy
+  vars:
+    haproxy_state: "present"
 
 - name: Initialize databases and users
   hosts: patroni_cluster[0]
