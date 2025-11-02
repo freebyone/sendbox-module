@@ -1,14 +1,15 @@
-- name: Check if primary node
+- name: Check cluster status
   uri:
-    url: "http://{{ ansible_host }}:{{ patroni_restapi_port }}/patroni"
+    url: "http://{{ ansible_host }}:{{ patroni_restapi_port }}/cluster"
     method: GET
-  register: patroni_info
+  register: cluster_info
   delegate_to: localhost
   run_once: true
 
-- name: Set primary node fact
+- name: Find primary node
   set_fact:
-    primary_node: "{{ patroni_info.json.role == 'master' or patroni_info.json.role == 'leader' }}"
+    primary_node: "{{ inventory_hostname == (cluster_info.json.members | selectattr('role', 'match', '(master|leader)') | map(attribute='name') | first) }}"
+  run_once: true
 
 - name: Create databases on primary
   community.postgresql.postgresql_db:
@@ -16,6 +17,9 @@
     owner: "{{ item.owner | default(omit) }}"
     encoding: "{{ item.encoding | default('UTF8') }}"
     state: present
+    login_host: "{{ ansible_host }}"
+    login_user: "postgres"
+    login_password: "{{ postgres_superuser_password }}"
   loop: "{{ databases }}"
   when: primary_node
   tags: create_db
@@ -24,20 +28,11 @@
   community.postgresql.postgresql_user:
     name: "{{ item.name }}"
     password: "{{ item.password }}"
-    role_attr_flags: "{{ item.privileges | join(',') }}"
+    role_attr_flags: "{{ item.privileges | default(omit) | join(',') }}"
     state: present
+    login_host: "{{ ansible_host }}"
+    login_user: "postgres" 
+    login_password: "{{ postgres_superuser_password }}"
   loop: "{{ users }}"
   when: primary_node
   tags: create_user
-
-- name: Grant database privileges
-  community.postgresql.postgresql_privs:
-    database: "{{ item.0 }}"
-    roles: "{{ item.1.name }}"
-    privs: "CONNECT"
-    state: present
-  with_subelements:
-    - "{{ users }}"
-    - databases
-  when: primary_node
-  tags: grant_privs
