@@ -6,13 +6,6 @@
     - etcd
   tags: etcd
 
-- name: Deploy Patroni PostgreSQL cluster
-  hosts: patroni_cluster
-  become: true
-  roles:
-    - patroni
-  tags: patroni
-
 - name: Deploy HAProxy load balancers
   hosts: haproxy_servers
   become: true
@@ -22,44 +15,9 @@
   vars:
     haproxy_state: "present"
 
-- name: Initialize databases and users
-  hosts: patroni_cluster[0]
+- name: Deploy Patroni PostgreSQL cluster
+  hosts: patroni_cluster
   become: true
-  vars:
-    postgres_superuser_password: "{{ vault_postgres_password }}"
-  tasks:
-    - name: Wait for primary election
-      pause: 
-        minutes: 1
-
-    - name: Check primary node
-      uri:
-        url: "http://{{ inventory_hostname }}:8008/patroni"
-        method: GET
-      register: patroni_info
-      until: patroni_info.json.role == "master" or patroni_info.json.role == "leader"
-      retries: 10
-      delay: 10
-
-    - name: Create application databases
-      community.postgresql.postgresql_db:
-        name: "{{ item.name }}"
-        owner: "{{ item.owner }}"
-        state: present
-        login_host: "{{ inventory_hostname }}"
-        login_user: postgres
-        login_password: "{{ postgres_superuser_password }}"
-      loop: "{{ databases }}"
-      when: patroni_info.json.role == "master" or patroni_info.json.role == "leader"
-
-    - name: Create application users
-      community.postgresql.postgresql_user:
-        name: "{{ item.name }}"
-        password: "{{ item.password }}"
-        state: present
-        login_host: "{{ inventory_hostname }}"
-        login_user: postgres
-        login_password: "{{ postgres_superuser_password }}"
-      loop: "{{ users }}"
-      when: patroni_info.json.role == "master" or patroni_info.json.role == "leader"
-  tags: init
+  roles:
+    - patroni
+  tags: patroni
