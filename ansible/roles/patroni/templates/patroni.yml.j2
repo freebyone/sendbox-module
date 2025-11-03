@@ -7,6 +7,9 @@ restapi:
 
 etcd:
   hosts: {{ etcd_servers }}
+  api_version: {{ etcd_api_version }}
+  protocol: http
+  use_proxies: false
 
 bootstrap:
   dcs:

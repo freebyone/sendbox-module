@@ -21,6 +21,12 @@
     group: "999"
     mode: '0644'
 
+- name: Pull Patroni image
+  community.docker.docker_image:
+    name: "{{ patroni_docker_image }}"
+    source: pull
+    force_source: yes
+
 - name: Deploy Patroni container
   community.docker.docker_container:
     name: "{{ patroni_cluster_name }}"
@@ -35,7 +41,10 @@
     env:
       PATRONI_NAME: "{{ inventory_hostname }}"
       PATRONI_SCOPE: "{{ patroni_scope }}"
+      PATRONI_LOG_LEVEL: "DEBUG"
     command: "patroni /etc/patroni/patroni.yml"
+    detach: true
+    timeout: 120
 
 - name: Wait for Patroni API
   uri:

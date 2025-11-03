@@ -6,6 +6,7 @@ effective_cache_size = {{ postgresql_effective_cache_size }}
 wal_level = replica
 synchronous_commit = on
 logging_collector = on
+password_encryption = scram-sha-256
 log_directory = 'log'
 log_filename = 'postgresql-%a.log'
 log_rotation_age = 1d

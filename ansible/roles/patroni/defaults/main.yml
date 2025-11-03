@@ -1,9 +1,10 @@
 flash_all: "false"
 
-patroni_docker_image: "ghcr.io/zalando/spilo-16:3.0"
+patroni_docker_image: "ghcr.io/zalando/spilo-17:4.0-p3"
 patroni_scope: "patroni-postgres-cluster"
 patroni_cluster_name: "patroni-postgres-cluster"
 new_cluster: "false"
+etcd_api_version: "v3"
 etcd_servers: "{% for host in groups['etcd_cluster'] %}{{ host }}:{{ etcd_client_port | default(2379) }}{% if not loop.last %},{% endif %}{% endfor %}"
 
 postgresql_data_dir: "/var/lib/postgresql/data"
