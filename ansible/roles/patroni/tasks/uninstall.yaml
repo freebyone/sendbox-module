@@ -1,6 +1,28 @@
 ---
+- name: Stop and disable Patroni service
+  systemd:
+    name: "{{ patroni_cluster_name }}"
+    state: stopped
+    enabled: no
+
+- name: Remove Patroni systemd service
+  file:
+    path: "/etc/systemd/system/{{ patroni_cluster_name }}.service"
+    state: absent
+
+- name: Remove Patroni container
+  docker_container:
+    name: "{{ patroni_cluster_name }}"
+    state: absent
+  ignore_errors: yes
+
+- name: Remove Patroni Docker image
+  docker_image:
+    name: "{{ patroni_docker_image }}"
+    state: absent
+  ignore_errors: yes
+
 - name: Remove data directories
-  become: true
   file:
     path: "{{ item }}"
     state: absent
@@ -8,21 +30,12 @@
     - "{{ postgresql_data_dir }}"
     - "{{ postgresql_wal_dir }}"
     - "/etc/patroni"
+    - "/var/log/patroni"
 
-- name: Stop and remove PgBouncer
-  become: true
-  package:
-    name: pgbouncer
-    state: absent
-  when: pgbouncer_enabled
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: yes
 
-- name: Remove backup configurations
-  become: true
-  file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-    - "/etc/pgbackrest"
-    - "/usr/local/bin/postgres-backup.sh"
-    - "/var/log/postgres-backup.log"
-  when: backup_enabled
+- name: Confirm cleanup
+  debug:
+    msg: "Patroni has been completely removed from {{ inventory_hostname }}"

@@ -1,0 +1,48 @@
+[Unit]
+Description=Patroni PostgreSQL High Availability
+Documentation=https://patroni.readthedocs.io
+After=docker.service
+Requires=docker.service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/etc/patroni
+
+ExecStartPre=-/usr/bin/docker stop {{ patroni_cluster_name }}
+ExecStartPre=-/usr/bin/docker rm {{ patroni_cluster_name }}
+
+ExecStart=/usr/bin/docker run \
+  --name {{ patroni_cluster_name }} \
+  --network host \
+  --volume {{ postgresql_data_dir }}:/home/postgres/pgdata \
+  --volume {{ postgresql_wal_dir }}:/home/postgres/pgwal \
+  --volume /etc/patroni/patroni.yml:/etc/patroni/patroni.yml:ro \
+  --log-driver=journald \
+  --log-opt tag="{{ patroni_cluster_name }}" \
+  {{ patroni_docker_image }} \
+  patroni /etc/patroni/patroni.yml
+
+ExecStop=/usr/bin/docker stop {{ patroni_cluster_name }}
+ExecStopPost=-/usr/bin/docker rm {{ patroni_cluster_name }}
+
+Restart=always
+RestartSec=10
+StartLimitInterval=60
+StartLimitBurst=3
+
+TimeoutStartSec=300
+TimeoutStopSec=60
+
+NoNewPrivileges=yes
+LimitNOFILE=65536
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier={{ patroni_cluster_name }}
+
+[Install]
+WantedBy=multi-user.target

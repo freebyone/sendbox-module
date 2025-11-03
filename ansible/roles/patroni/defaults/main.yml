@@ -31,7 +31,6 @@ postgresql_parameters:
   max_wal_senders: "10"
   max_replication_slots: "10"
 
-docker_restart_policy: "unless-stopped"
 backup_enabled: false
 backup_method: "pgbackrest"
 pgbouncer_enabled: true
@@ -39,3 +38,8 @@ backup_s3_bucket: "my-postgres-backups"
 backup_s3_region: "us-east-1"
 backup_retention_days: 30
 backup_schedule: "0 2 * * *"
+
+patroni_service_name: "{{ patroni_cluster_name }}"
+docker_restart_policy: "no"
+
+patroni_service_state: "started"
