@@ -1,6 +1,6 @@
 flash_all: "false"
 
-patroni_docker_image: "ghcr.io/zalando/spilo-17:4.0-p3"
+patroni_docker_image: "ghcr.io/zalando/spilo-18:latest"
 patroni_scope: "patroni-postgres-cluster"
 patroni_cluster_name: "patroni-postgres-cluster"
 new_cluster: "false"

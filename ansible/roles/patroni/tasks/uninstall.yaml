@@ -14,13 +14,13 @@
   docker_container:
     name: "{{ patroni_cluster_name }}"
     state: absent
-  ignore_errors: yes
+  ignore_errors: true
 
 - name: Remove Patroni Docker image
   docker_image:
     name: "{{ patroni_docker_image }}"
     state: absent
-  ignore_errors: yes
+  ignore_errors: true
 
 - name: Remove data directories
   file:
