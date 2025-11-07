@@ -1,11 +1,9 @@
 ---
-- name: Create base directory
+- name: Create base directory as root
   become: true
   file:
     path: "{{ patroni_base_dir }}"
     state: directory
-    owner: postgres
-    group: postgres
     mode: '0755'
 
 - name: Pull Patroni Docker image
@@ -17,13 +15,11 @@
   retries: 3
   delay: 5
 
-- name: Generate Patroni configuration
+- name: Generate Patroni configuration as root
   become: true
   template:
     src: patroni.yml.j2
     dest: "{{ patroni_config_dir }}/patroni.yml"
-    owner: postgres
-    group: postgres
     mode: '0644'
 
 - name: Create Patroni systemd service
