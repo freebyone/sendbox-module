@@ -1,27 +1,33 @@
 ---
-- name: Create directories
+- name: Create base directory
   become: true
   file:
-    path: "{{ item }}"
+    path: "{{ patroni_base_dir }}"
     state: directory
-    owner: "999"
-    group: "999"
+    owner: postgres
+    group: postgres
     mode: '0755'
-  loop:
-    - "{{ postgresql_data_dir }}"
-    - "{{ postgresql_wal_dir }}"
-    - "/etc/patroni"
-    - "/var/log/patroni"
+
+- name: Pull Patroni Docker image
+  become: true
+  docker_image:
+    name: "{{ patroni_docker_image }}"
+    source: pull
+  register: image_pull
+  retries: 3
+  delay: 5
 
 - name: Generate Patroni configuration
+  become: true
   template:
     src: patroni.yml.j2
-    dest: "/etc/patroni/patroni.yml"
-    owner: "999"
-    group: "999"
+    dest: "{{ patroni_config_dir }}/patroni.yml"
+    owner: postgres
+    group: postgres
     mode: '0644'
 
 - name: Create Patroni systemd service
+  become: true
   template:
     src: patroni.service.j2
     dest: "/etc/systemd/system/{{ patroni_cluster_name }}.service"
@@ -30,22 +36,27 @@
     mode: '0644'
 
 - name: Reload systemd daemon
+  become: true
   systemd:
     daemon_reload: yes
 
 - name: Start and enable Patroni service
+  become: true
   systemd:
     name: "{{ patroni_cluster_name }}"
     state: started
     enabled: yes
 
-- name: Wait for Patroni service to start
+- name: Wait for PostgreSQL to be ready
   wait_for:
-    path: /var/run/docker.sock
-    state: started
+    host: "{{ ansible_host }}"
+    port: "{{ postgresql_port }}"
+    timeout: 60
   delay: 10
+  retries: 6
 
 - name: Check service status
+  become: true
   systemd:
     name: "{{ patroni_cluster_name }}"
   register: service_status
@@ -53,34 +64,3 @@
 - name: Show service status
   debug:
     var: service_status.status.ActiveState
-
-- name: Check container status via service
-  command: "docker ps -f name={{ patroni_cluster_name }}"
-  register: container_status
-  changed_when: false
-
-- name: Show container status
-  debug:
-    var: container_status.stdout
-
-- name: Wait for Patroni API
-  uri:
-    url: "http://{{ ansible_host }}:{{ patroni_restapi_port }}/health"
-    method: GET
-    status_code: 200
-    timeout: 10
-  register: result
-  until: result.status == 200
-  retries: 30
-  delay: 10
-
-- name: Check cluster status
-  uri:
-    url: "http://{{ ansible_host }}:{{ patroni_restapi_port }}/cluster"
-    method: GET
-    timeout: 10
-  register: cluster_info
-
-- name: Show cluster status
-  debug:
-    var: cluster_info.json

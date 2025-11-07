@@ -4,16 +4,19 @@
     name: "{{ patroni_cluster_name }}"
     state: stopped
     enabled: no
+  ignore_errors: true
 
 - name: Remove Patroni systemd service
   file:
     path: "/etc/systemd/system/{{ patroni_cluster_name }}.service"
     state: absent
+  ignore_errors: true
 
 - name: Remove Patroni container
   docker_container:
     name: "{{ patroni_cluster_name }}"
     state: absent
+    force_kill: yes
   ignore_errors: true
 
 - name: Remove Patroni Docker image
@@ -22,15 +25,11 @@
     state: absent
   ignore_errors: true
 
-- name: Remove data directories
+- name: Remove base directory (optional)
   file:
-    path: "{{ item }}"
+    path: "{{ patroni_base_dir }}"
     state: absent
-  loop:
-    - "{{ postgresql_data_dir }}"
-    - "{{ postgresql_wal_dir }}"
-    - "/etc/patroni"
-    - "/var/log/patroni"
+  ignore_errors: true
 
 - name: Reload systemd daemon
   systemd:
@@ -38,4 +37,4 @@
 
 - name: Confirm cleanup
   debug:
-    msg: "Patroni has been completely removed from {{ inventory_hostname }}"
+    msg: "Patroni cluster has been completely removed from {{ inventory_hostname }}"

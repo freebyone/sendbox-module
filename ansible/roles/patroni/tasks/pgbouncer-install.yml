@@ -1,4 +1,41 @@
 ---
+- name: Create PgBouncer configuration directory
+  become: true
+  file:
+    path: "{{ pgbouncer_config_dir }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: '0755'
+  when: pgbouncer_enabled
+
+- name: Create PgBouncer configuration in central directory
+  template:
+    src: pgbouncer.ini.j2
+    dest: "{{ pgbouncer_config_dir }}/pgbouncer.ini"
+    owner: postgres
+    group: postgres
+    mode: '0640'
+  when: pgbouncer_enabled
+
+- name: Create PgBouncer HBA configuration in central directory
+  template:
+    src: pgb_hba.conf.j2
+    dest: "{{ pgbouncer_config_dir }}/pgb_hba.conf"
+    owner: postgres
+    group: postgres
+    mode: '0640'
+  when: pgbouncer_enabled
+
+- name: Create userlist file in central directory
+  template:
+    src: userlist.txt.j2
+    dest: "{{ pgbouncer_config_dir }}/userlist.txt"
+    owner: postgres
+    group: postgres
+    mode: '0640'
+  when: pgbouncer_enabled
+
 - name: Install PgBouncer
   become: true
   package:
@@ -6,31 +43,12 @@
     state: present
   when: pgbouncer_enabled
 
-- name: Create PgBouncer configuration
-  template:
-    src: pgbouncer.ini.j2
-    dest: "/etc/pgbouncer/pgbouncer.ini"
-    owner: "postgres"
-    group: "postgres"
-    mode: '0640'
-  when: pgbouncer_enabled
-
-- name: Create PgBouncer HBA configuration
-  template:
-    src: pgb_hba.conf.j2
-    dest: "/etc/pgbouncer/pgb_hba.conf"
-    owner: "postgres"
-    group: "postgres"
-    mode: '0640'
-  when: pgbouncer_enabled
-
-- name: Create userlist file
-  template:
-    src: userlist.txt.j2
-    dest: "/etc/pgbouncer/userlist.txt"
-    owner: "postgres"
-    group: "postgres"
-    mode: '0640'
+- name: Create symlink from /etc/pgbouncer to central directory
+  file:
+    src: "{{ pgbouncer_config_dir }}"
+    dest: "/etc/pgbouncer"
+    state: link
+    force: yes
   when: pgbouncer_enabled
 
 - name: Start and enable PgBouncer

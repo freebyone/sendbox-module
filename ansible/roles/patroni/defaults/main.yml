@@ -1,27 +1,29 @@
-flash_all: "false"
+patroni_base_dir: "/data/patroni-postgres-cluster"
 
-patroni_docker_image: "ghcr.io/zalando/spilo-18:latest"
+patroni_config_dir: "{{ patroni_base_dir }}/patroni"
+postgresql_data_dir: "{{ patroni_base_dir }}/data"
+postgresql_wal_dir: "{{ patroni_base_dir }}/wal"
+pgbouncer_config_dir: "{{ patroni_base_dir }}/pgbouncer"
+
+flash_all: false
+patroni_docker_image: "ghcr.io/zalando/spilo-17:4.0-p3"
 patroni_scope: "patroni-postgres-cluster"
 patroni_cluster_name: "patroni-postgres-cluster"
-new_cluster: "false"
+new_cluster: false
+
 etcd_api_version: "v3"
-etcd_servers: "{% for host in groups['etcd_cluster'] %}{{ host }}:{{ etcd_client_port | default(2379) }}{% if not loop.last %},{% endif %}{% endfor %}"
-
-postgresql_data_dir: "/var/lib/postgresql/data"
-postgresql_wal_dir: "/var/lib/postgresql/wal"
-
+etcd_servers: "{% for host in groups['etcd_cluster'] %}{{ hostvars[host].ansible_host | default(host) }}:{{ etcd_client_port | default(2379) }}{% if not loop.last %},{% endif %}{% endfor %}"
 patroni_restapi_port: 8008
 postgresql_port: 5432
+with_pgbouncer: false
+create_db: false
 
-with_pgbouncer: "false"
-
-# Management
-create_db: "false"
 replication_password: "admin"
 postgres_superuser_password: "admin"
-# DB and userlist
 postgres_admin_users: admin_user
 monitoring_user: stats_user
+patroni_restapi_username: "admin"
+patroni_restapi_password: "admin"
 
 postgresql_parameters:
   max_connections: "100"
@@ -41,5 +43,4 @@ backup_schedule: "0 2 * * *"
 
 patroni_service_name: "{{ patroni_cluster_name }}"
 docker_restart_policy: "no"
-
 patroni_service_state: "started"
