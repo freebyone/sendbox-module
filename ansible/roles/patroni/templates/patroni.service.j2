@@ -1,60 +1,23 @@
 [Unit]
-Description=Patroni PostgreSQL High Availability
-Documentation=https://patroni.readthedocs.io
+Description=Patroni PostgreSQL Cluster
 After=docker.service
 Requires=docker.service
-Wants=network-online.target
-After=network-online.target
 
 [Service]
 Type=simple
-User=root
-Group=root
-WorkingDirectory={{ patroni_config_dir }}
-
-ExecStartPre=-/usr/bin/docker stop {{ patroni_cluster_name }}
-ExecStartPre=-/usr/bin/docker rm {{ patroni_cluster_name }}
-ExecStartPre=/bin/sleep 2
-
-ExecStart=/usr/bin/docker run \
-  --name {{ patroni_cluster_name }} \
-  --network host \
-  --privileged \
-  --user root \
-  --volume {{ patroni_base_dir }}:{{ patroni_base_dir }} \
-  --volume {{ patroni_config_dir }}/patroni.yml:/etc/patroni/patroni.yml:ro \
-  --volume /etc/passwd:/etc/passwd:ro \
-  --volume /etc/group:/etc/group:ro \
-  --log-driver=journald \
-  --log-opt tag="{{ patroni_cluster_name }}" \
-  --env SCOPE={{ patroni_scope }} \
-  --env PATRONI_NAME={{ inventory_hostname }} \
-  --env PATRONI_POSTGRESQL_DATA_DIR={{ postgresql_data_dir }} \
-  --env PATRONI_RESTAPI_LISTEN=0.0.0.0:{{ patroni_restapi_port }} \
-  --env PATRONI_RESTAPI_CONNECT_ADDRESS={{ ansible_host }}:{{ patroni_restapi_port }} \
-  --env PATRONI_POSTGRESQL_LISTEN=0.0.0.0:{{ postgresql_port }} \
-  --env PATRONI_POSTGRESQL_CONNECT_ADDRESS={{ ansible_host }}:{{ postgresql_port }} \
-  --env PGUSER=postgres \
-  --env PGPASSWORD={{ postgres_superuser_password }} \
+User=postgres
+Group=postgres
+ExecStart=/usr/bin/docker run --rm --name patroni \
+  --network=host \
+  --volume=/data/patroni-postgres-cluster/patroni:/etc/patroni \
+  --volume=/data/patroni-postgres-cluster/data:/home/postgres/pgdata/pgroot/data \
+  --volume=/data/patroni-postgres-cluster/logs:/home/postgres/pgdata/pgroot/logs \
+  --volume=/data/patroni-postgres-cluster/wal:/home/postgres/pgdata/pgroot/wal \
+  -e PATRONI_CONFIGURATION=/etc/patroni/patroni.yml \
   {{ patroni_docker_image }}
-
-ExecStop=/usr/bin/docker stop {{ patroni_cluster_name }}
-ExecStopPost=-/usr/bin/docker rm {{ patroni_cluster_name }}
-
-Restart=on-failure
+ExecStop=/usr/bin/docker stop patroni
+Restart=always
 RestartSec=10
-StartLimitInterval=60
-StartLimitBurst=3
-
-TimeoutStartSec=120
-TimeoutStopSec=30
-
-NoNewPrivileges=yes
-LimitNOFILE=65536
-
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier={{ patroni_cluster_name }}
 
 [Install]
 WantedBy=multi-user.target

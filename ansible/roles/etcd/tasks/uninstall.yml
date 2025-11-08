@@ -10,24 +10,17 @@
     path: /etc/systemd/system/{{ etcd_service }}
     state: absent
 
-- name: Stop etcd container
-  docker_container:
-    name: "{{ etcd_cluster }}"
-    state: stopped
-    force_kill: yes
-  ignore_errors: yes
-
 - name: Remove etcd container
   docker_container:
     name: "{{ etcd_cluster }}"
     state: absent
-  ignore_errors: yes
+  ignore_errors: true
 
 - name: Remove etcd Docker image
   docker_image:
     name: "{{ etcd_docker_image }}"
     state: absent
-  ignore_errors: yes
+  ignore_errors: true
 
 - name: Remove etcd data directory
   file:
