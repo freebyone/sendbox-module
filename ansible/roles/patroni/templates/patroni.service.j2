@@ -1,23 +1,48 @@
 [Unit]
-Description=Patroni PostgreSQL Cluster
+Description=Patroni PostgreSQL High Availability
+Documentation=https://patroni.readthedocs.io
 After=docker.service
 Requires=docker.service
 
 [Service]
 Type=simple
-User=postgres
-Group=postgres
-ExecStart=/usr/bin/docker run --rm --name patroni \
-  --network=host \
-  --volume=/data/patroni-postgres-cluster/patroni:/etc/patroni \
-  --volume=/data/patroni-postgres-cluster/data:/home/postgres/pgdata/pgroot/data \
-  --volume=/data/patroni-postgres-cluster/logs:/home/postgres/pgdata/pgroot/logs \
-  --volume=/data/patroni-postgres-cluster/wal:/home/postgres/pgdata/pgroot/wal \
+User=root
+Group=root
+WorkingDirectory={{ patroni_config_dir }}
+
+ExecStartPre=-/usr/bin/docker stop {{ patroni_cluster_name }}
+ExecStartPre=-/usr/bin/docker rm {{ patroni_cluster_name }}
+ExecStartPre=/bin/sleep 2
+
+ExecStart=/usr/bin/docker run \
+  --name {{ patroni_cluster_name }} \
+  --network host \
+  --privileged \
+  --volume {{ patroni_base_dir }}:{{ patroni_base_dir }} \
+  --volume {{ patroni_config_dir }}/patroni.yml:/etc/patroni/patroni.yml:ro \
+  --log-driver=journald \
+  --log-opt tag="{{ patroni_cluster_name }}" \
   -e PATRONI_CONFIGURATION=/etc/patroni/patroni.yml \
   {{ patroni_docker_image }}
-ExecStop=/usr/bin/docker stop patroni
-Restart=always
+
+
+ExecStop=/usr/bin/docker stop {{ patroni_cluster_name }}
+ExecStopPost=-/usr/bin/docker rm {{ patroni_cluster_name }}
+
+Restart=on-failure
 RestartSec=10
+StartLimitInterval=60
+StartLimitBurst=3
+
+TimeoutStartSec=120
+TimeoutStopSec=30
+
+NoNewPrivileges=yes
+LimitNOFILE=65536
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier={{ patroni_cluster_name }}
 
 [Install]
 WantedBy=multi-user.target
