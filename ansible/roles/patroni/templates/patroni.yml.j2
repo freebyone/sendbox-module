@@ -21,9 +21,9 @@ bootstrap:
       parameters:
         listen_addresses: '0.0.0.0'
         port: {{ postgresql_port }}
-        {% for key, value in postgresql_parameters.items() %}
-        {{ key }}: "{{ value }}"
-        {% endfor %}
+    {% for key, value in postgresql_parameters.items() %}
+    {{ key }}: "{{ value }}"
+    {% endfor %}
 
   initdb:
   - encoding: UTF8
