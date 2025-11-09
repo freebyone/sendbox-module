@@ -169,7 +169,7 @@ EOF
       
       node_config.vm.provider "virtualbox" do |vb|
         vb.name = node[:name]
-        vb.memory = 1024
+        vb.memory = 2048
         vb.cpus = 1
         
         if Vagrant::Util::Platform.windows?
