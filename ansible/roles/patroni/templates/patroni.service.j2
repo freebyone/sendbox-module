@@ -19,10 +19,10 @@ ExecStart=/usr/bin/docker run \
   --network host \
   --privileged \
   --volume {{ patroni_base_dir }}:{{ patroni_base_dir }} \
-  --volume {{ patroni_config_dir }}/patroni.yml:/etc/patroni/patroni.yml:ro \
+  --volume {{ patroni_config_dir }}/patroni.yml:/home/postgres/postgres.yml \
   --log-driver=journald \
   --log-opt tag="{{ patroni_cluster_name }}" \
-  -e PATRONI_CONFIGURATION=/etc/patroni/patroni.yml \
+  -e ETCD3_HOSTS="{{ etcd_servers }}"
   {{ patroni_docker_image }}
 
 

@@ -1,10 +1,11 @@
 patroni_base_dir: "/data/patroni-postgres-cluster"
 
 patroni_config_dir: "{{ patroni_base_dir }}/patroni"
-postgresql_data_dir: "{{ patroni_base_dir }}/data"
+postgresql_data_dir: "{{ patroni_base_dir }}/data/{{ postrges_version }}/"
 postgresql_wal_dir: "{{ patroni_base_dir }}/wal"
 pgbouncer_config_dir: "{{ patroni_base_dir }}/pgbouncer"
 postgres_home_dir: "/var/lib/postgresql"
+postrges_version: 17
 
 flash_all: false
 patroni_docker_image: "ghcr.io/zalando/spilo-17:4.0-p3"
