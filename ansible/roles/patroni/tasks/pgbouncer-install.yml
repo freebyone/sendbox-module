@@ -18,15 +18,6 @@
     mode: '0640'
   when: pgbouncer_enabled
 
-- name: Create PgBouncer HBA configuration in central directory
-  template:
-    src: pgb_hba.conf.j2
-    dest: "{{ pgbouncer_config_dir }}/pgb_hba.conf"
-    owner: postgres
-    group: postgres
-    mode: '0640'
-  when: pgbouncer_enabled
-
 - name: Create userlist file in central directory
   template:
     src: userlist.txt.j2
