@@ -3,11 +3,11 @@
   become: true
   ansible.builtin.import_tasks: install.yml
   when: flash_all != true
-  
+
 - name: Install pgbouncer
   become: true
   ansible.builtin.import_tasks: pgbouncer-install.yml
-  when: flash_all != true and pgbouncer == true
+  when: flash_all != true and with_pgbouncer == true
 
 - name: Create databases with role and user in cluster
   become: true

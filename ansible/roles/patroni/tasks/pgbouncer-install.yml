@@ -7,7 +7,6 @@
     owner: postgres
     group: postgres
     mode: '0755'
-  when: pgbouncer_enabled
 
 - name: Create PgBouncer configuration in central directory
   template:
@@ -16,7 +15,6 @@
     owner: postgres
     group: postgres
     mode: '0640'
-  when: pgbouncer_enabled
 
 - name: Create userlist file in central directory
   template:
@@ -25,14 +23,12 @@
     owner: postgres
     group: postgres
     mode: '0640'
-  when: pgbouncer_enabled
 
 - name: Install PgBouncer
   become: true
   package:
     name: pgbouncer
     state: present
-  when: pgbouncer_enabled
 
 - name: Create symlink from /etc/pgbouncer to central directory
   file:
@@ -40,7 +36,6 @@
     dest: "/etc/pgbouncer"
     state: link
     force: yes
-  when: pgbouncer_enabled
 
 - name: Start and enable PgBouncer
   become: true
@@ -48,4 +43,3 @@
     name: pgbouncer
     state: started
     enabled: yes
-  when: pgbouncer_enabled

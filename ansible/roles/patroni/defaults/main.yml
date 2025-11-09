@@ -22,7 +22,6 @@ with_pgbouncer: false
 create_db: false
 backup_enabled: false
 backup_method: "pgbackrest"
-pgbouncer_enabled: false
 
 replication_password: "admin"
 postgres_superuser_password: "admin"

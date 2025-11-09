@@ -36,3 +36,21 @@
   loop: "{{ users }}"
   when: primary_node
   tags: create_user
+
+- name: Create PgBouncer configuration in central directory
+  template:
+    src: pgbouncer.ini.j2
+    dest: "{{ pgbouncer_config_dir }}/pgbouncer.ini"
+    owner: postgres
+    group: postgres
+    mode: '0640'
+  when: with_pgbouncer == true
+
+- name: Create userlist file in central directory
+  template:
+    src: userlist.txt.j2
+    dest: "{{ pgbouncer_config_dir }}/userlist.txt"
+    owner: postgres
+    group: postgres
+    mode: '0640'
+  when: with_pgbouncer == true

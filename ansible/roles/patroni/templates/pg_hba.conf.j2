@@ -1,5 +1,0 @@
-# TYPE  DATABASE        USER            ADDRESS                 METHOD
-
-{% for item in postgresql_pg_hba_config %}
-{{ item.type }} {{ item.database }} {{ item.user }} {{ item.address | default('') }} {{ item.auth_method }}
-{% endfor %}
