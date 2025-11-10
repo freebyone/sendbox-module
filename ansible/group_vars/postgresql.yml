@@ -1,29 +1,4 @@
 ---
-postgresql_version: 15
-
-postgresql_listen_addresses: "localhost"
-postgresql_max_connections: 100
-postgresql_shared_buffers: "128MB"
-postgresql_effective_cache_size: "1GB"
-
-postgresql_databases:
-  - name: postgres
-    encoding: UTF8
-    lc_collate: en_US.UTF-8
-    lc_ctype: en_US.UTF-8
-
-  - name: postgres
-    password: "vault_path"
-    role_flags: "SUPERUSER,CREATEDB,LOGIN"
-    databases: [postgres]
-
-postgresql_pg_hba_config:
-  - { type: local, database: all, user: postgres, auth_method: trust }
-  - { type: local, database: all, user: all, auth_method: trust }
-  - { type: host, database: all, user: all, address: "127.0.0.1/32", auth_method: scram-sha-256 }
-  - { type: host, database: all, user: all, address: "::1/128", auth_method: scram-sha-256 }
-  - { type: host, database: all, user: all, address: "192.168.56.0/24", auth_method: scram-sha-256 }
-
 patroni_cluster_name: "postgres-cluster"
 
 databases:
@@ -40,8 +15,8 @@ users:
     privileges: ["LOGIN"]
 
 pgbouncer_databases:
-  - name: myapp
-  - name: monitoring
+  - name: pgbouncer
+  - name: pgbouncer
 
 etcd_client_port: 2379
 etcd_peer_port: 2380

@@ -1,8 +1,0 @@
----
-- name: Include install tasks
-  ansible.builtin.include_tasks: install.yml
-  when: not flash_all | default(false)
-
-- name: Include uninstall tasks  
-  ansible.builtin.include_tasks: uninstall.yml
-  when: flash_all | default(false)

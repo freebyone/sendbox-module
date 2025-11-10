@@ -1,8 +1,0 @@
----
-- name: Include HAProxy installation task
-  ansible.builtin.include_tasks: install.yml
-  when: flash_all != true
-
-- name: Include HAProxy uninstallation task
-  ansible.builtin.include_tasks: uninstall.yml
-  when: flash_all == true

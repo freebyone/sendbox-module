@@ -17,3 +17,18 @@
   src: https://github.com/grafana/grafana-ansible-collection
   version: main
   scm: git
+
+- name: ansible-etcd-cluster
+  src: https://github.com/freebyone/ansible-role-etcd-cluster
+  version: main
+  scm: git
+
+- name: ansible-haproxy-cluster
+  src: https://github.com/freebyone/ansible-role-haproxy-cluster
+  version: main
+  scm: git
+
+- name: ansible-patroni-postgres
+  src: https://github.com/freebyone/ansible-role-patroni-postgres-cluster
+  version: main
+  scm: git
