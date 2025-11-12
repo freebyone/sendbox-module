@@ -3,14 +3,14 @@
   hosts: etcd_cluster
   become: true
   roles:
-    - etcd
+    - ansible-etcd-cluster
   tags: etcd
 
 - name: Deploy HAProxy load balancers
   hosts: haproxy_servers
   become: true
   roles:
-    - haproxy
+    - ansible-haproxy-cluster
   tags: haproxy
   vars:
     haproxy_state: "present"
@@ -19,5 +19,5 @@
   hosts: patroni_cluster
   become: true
   roles:
-    - patroni
+    - ansible-patroni-postgres
   tags: patroni

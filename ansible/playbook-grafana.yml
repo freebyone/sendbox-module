@@ -1,28 +1,27 @@
 ---
-- name: Deploy Grafana cluster
-  hosts: cluster
+- name: Debug Grafana installation
+  hosts: grafana_servers
   become: yes
-  vars_files:
-    - "group_vars/grafana.yml"
-  
-  collections:
-    - grafana.grafana
+  vars:
+    grafana_version: "12.2.2"
 
   tasks:
-    - name: Wait for Grafana to start
-      wait_for:
-        port: "{{ grafana_server_http_port }}"
-        host: "{{ inventory_hostname }}"
-        delay: 10
-        timeout: 60
+    - name: Check what variables are expected by the role
+      include_vars: "shared-roles/grafana-ansible-collection/grafana-ansible-collection/roles/grafana/defaults/main.yml"
+      run_once: true
+      delegate_to: inventory_hostname
 
-    - name: Check Grafana health
-      uri:
-        url: "http://{{ inventory_hostname }}:{{ grafana_server_http_port }}/api/health"
-        method: GET
-        status_code: 200
-        timeout: 10
-      register: health_check
-      until: health_check.status == 200
-      retries: 5
-      delay: 10
+    - name: Debug role defaults
+      debug:
+        var: hostvars[inventory_hostname]
+      run_once: true
+      delegate_to: inventory_hostname
+
+    - name: Include Grafana tasks with error handling
+      block:
+        - name: Include Grafana tasks
+          include_tasks: "shared-roles/grafana-ansible-collection/grafana-ansible-collection/roles/grafana/tasks/main.yml"
+      rescue:
+        - name: Show error details
+          debug:
+            msg: "Grafana role failed, check required variables"
