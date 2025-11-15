@@ -1,5 +1,4 @@
 ---
-# Docker vars
 docker_users:
   - vagrant
 

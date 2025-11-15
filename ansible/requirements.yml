@@ -13,11 +13,6 @@
   version: master
   scm: git
 
-- name: grafana-ansible-collection
-  src: https://github.com/grafana/grafana-ansible-collection
-  version: main
-  scm: git
-
 - name: ansible-etcd-cluster
   src: https://github.com/freebyone/ansible-role-etcd-cluster
   version: main

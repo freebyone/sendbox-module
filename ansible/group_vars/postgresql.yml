@@ -3,24 +3,20 @@ patroni_cluster_name: "postgres-cluster"
 
 databases:
   - name: app
-    owner: user
-  - name: monitoring
+    owner: appuser
+    encoding: UTF8
+  - name: appdb
     owner: postgres
 
 users:
-  - name: user
-    password: "{{ vault_app_password }}"
-  - name: readuser
-    password: "{{ vault_read_password }}"
-    privileges: ["LOGIN"]
-
-pgbouncer_databases:
-  - name: pgbouncer
-  - name: pgbouncer
+  - name: appuser
+    password: appuser
+    privileges:
+      - LOGIN
+      - CREATEDB
 
 etcd_client_port: 2379
 etcd_peer_port: 2380
 patroni_restapi_port: 8008
 postgresql_port: 5432
 pgbouncer_port: 6432
-haproxy_frontend_port: 5000
