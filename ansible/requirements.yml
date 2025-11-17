@@ -1,13 +1,3 @@
-- name: ansible-minio
-  src: https://github.com/atosatto/ansible-minio
-  version: master
-  scm: git
-
-- name: ansible-role-nginx
-  src: https://github.com/nginx/ansible-role-nginx
-  version: main
-  scm: git
-
 - name: ansible-victoriametrics-cluster-role
   src: https://github.com/Slapper/ansible-victoriametrics-cluster-role
   version: master

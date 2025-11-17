@@ -12,8 +12,6 @@
   roles:
     - ansible-haproxy-cluster
   tags: haproxy
-  vars:
-    haproxy_state: "present"
 
 - name: Deploy Patroni PostgreSQL cluster
   hosts: patroni_cluster
