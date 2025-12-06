@@ -22,22 +22,22 @@ A powerful, flexible Vagrant-based infrastructure for creating dynamic multi-nod
 ## 🚀 Quick Start
 
 1. **Clone and navigate to the project directory**
-   ```bash
-   git clone https://github.com/freebyone/sendbox-module.git
-   cd sendbox-module
-   ```
+```
+git clone https://github.com/freebyone/sendbox-module.git
+cd sendbox-module
+```
    
 2. Start the infrastructure
 
 ```bash
 vagrant up
  ```
-Access the jump host
+3. Access the jump host
 
 ```bash
 vagrant ssh jump
  ```
-Connect to any node from the jump host
+4. Connect to any node from the jump host
 
  ```bash
 ssh node1
@@ -49,7 +49,7 @@ ssh node2
 Basic Configuration
 Edit the Vagrantfile to customize your setup:
 
-env
+Configuration vars
  ```
 NODE_COUNT = 5           # Number of cluster nodes
 JUMP_HOST_IP = "192.168.56.100"
@@ -106,16 +106,19 @@ CPU: 1 core
      └─────────────────────────────────────────────┘
 
 📁 Project Structure
-text
+```
 .
-├── Vagrantfile          # Main configuration file
-├── ansible/             # Your Ansible playbooks and inventory
-│   ├── ansible.cfg      # Ansible configuration (optional)
-│   ├── inventory        # Inventory file (optional)
-│   └── playbooks/       # Your playbooks
-├── README.md            # This file
-└── .gitignore           # Git ignore file
-
+├── Vagrantfile              # Основной файл конфигурации
+├── ansible/                 # Ansible плейбуки и инвентарь
+│   ├── ansible.cfg          # Конфигурация Ansible (опционально)
+│   ├── inventory            # Файл инвентаря (опционально)
+│   └── playbooks/           # Ваши плейбуки
+│       ├── common.yml       # Общий плейбук настройки
+│       ├── web.yml          # Плейбук веб-сервера
+│       └── db.yml           # Плейбук базы данных
+├── README.md                # Эта документация
+└── .gitignore               # Файл исключений Git
+```
 🔧 **Usage Examples
 Managing the Infrastructure
 
