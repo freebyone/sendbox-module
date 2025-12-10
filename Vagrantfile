@@ -1,17 +1,36 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-# Configure for vagrantfile
-NODE_COUNT = 5  # Count nodes
+# Configuration for vagrantfile
+NODE_COUNT = 5  # Number of nodes
 JUMP_HOST_IP = "192.168.56.100"
 NODE_IP_BASE = "192.168.56"
 NODE_IP_START = 10  # First node IP
 JUMP_HOST_PORT = 2210
 NODE_PORT_START = 2201  # First node port
 
+# ==================== HIGH NODE CONFIGURATION ====================
+# Settings for high-performance node
+HIGH_NODE_ENABLED = true
+HIGH_NODE_INDEX = 1
+HIGH_NODE_CPU = 3
+HIGH_NODE_MEM = 6144  # 6GB in MB
+
+# Default settings for regular nodes
+DEFAULT_NODE_CPU = 1
+DEFAULT_NODE_MEM = 2048  # 2GB in MB
+
 Vagrant.configure("2") do |config|
   config.vm.box = "ubuntu/jammy64"
   config.vm.box_check_update = false
+  
+  # Configure SSH to be more reliable
+  config.ssh.insert_key = false
+  config.ssh.forward_agent = true
+  config.ssh.keep_alive = true
+  
+  # Increase boot timeout for nodes
+  config.vm.boot_timeout = 600  # 10 minutes instead of default 5
 
   # ==================== JUMP HOST ====================
   config.vm.define "jump" do |jump_config|
@@ -28,6 +47,9 @@ Vagrant.configure("2") do |config|
       vb.name = "jump-host"
       vb.memory = 1024
       vb.cpus = 1
+      # Add VM customization for better stability
+      vb.gui = false
+      vb.customize ["modifyvm", :id, "--cableconnected1", "on"]
       if Vagrant::Util::Platform.windows?
         vb.customize ["modifyvm", :id, "--nictype1", "virtio"]
         vb.customize ["modifyvm", :id, "--nictype2", "virtio"]
@@ -83,7 +105,7 @@ EOF
 
     jump_config.vm.provision "file", source: "./ansible", destination: "/home/vagrant/"
     
-    # POST-PROVISIONING для jump host
+    # POST-PROVISIONING for jump host
     jump_config.vm.provision "dynamic-config", type: "shell", run: "always", inline: <<-SHELL
       echo "=== Updating dynamic configuration on Jump Host ==="
       
@@ -103,7 +125,7 @@ ff02::2 ip6-allrouters
 #{JUMP_HOST_IP} jump
 EOF
       
-      # Added nodes in hosts
+      # Add nodes to hosts file
       #{NODE_COUNT.times.map { |i| 
         node_ip = "#{NODE_IP_BASE}.#{NODE_IP_START + i}"
         node_name = "node#{i+1}"
@@ -138,6 +160,11 @@ SSHCONFIG"
       
       echo "=== Dynamic configuration completed ==="
       echo "Total nodes configured: #{NODE_COUNT}"
+      #{if HIGH_NODE_ENABLED
+        "echo 'High node configuration: Node#{HIGH_NODE_INDEX} with #{HIGH_NODE_CPU} CPUs and #{HIGH_NODE_MEM}MB RAM'"
+      else
+        "echo 'High node: DISABLED (all nodes have equal resources)'"
+      end}
       echo "Node IP range: #{NODE_IP_BASE}.#{NODE_IP_START} - #{NODE_IP_BASE}.#{NODE_IP_START + NODE_COUNT - 1}"
       echo "SSH to nodes: ssh node1, ssh node2, ..., ssh node#{NODE_COUNT}"
     SHELL
@@ -145,7 +172,7 @@ SSHCONFIG"
 
   # ==================== NODES ====================
   
-  # Dynemic configuration for nodes
+  # Dynamic configuration for nodes
   (1..NODE_COUNT).each do |i|
     node_ip = "#{NODE_IP_BASE}.#{NODE_IP_START + i - 1}"
     node_port = NODE_PORT_START + i - 1
@@ -163,20 +190,67 @@ SSHCONFIG"
         ip: node_ip,
         virtualbox__intnet: "cluster-network"
       
+      # Track if we've already printed configuration for this node
+      @printed_nodes ||= {}
+      
       node_config.vm.provider "virtualbox" do |vb|
-        vb.name = node_name
-        vb.memory = 2048
-        vb.cpus = 1
+        # Use a unique VM name to avoid conflicts
+        vb.name = "cluster-#{node_name}"
+        
+        # Determine node configuration
+        if HIGH_NODE_ENABLED && i == HIGH_NODE_INDEX
+          # Node with high resources
+          vb.memory = HIGH_NODE_MEM
+          vb.cpus = HIGH_NODE_CPU
+          # Print configuration only once per node
+          unless @printed_nodes[node_name]
+            puts "🚀 Configuring #{node_name} as HIGH-PERFORMANCE NODE"
+            puts "   CPU: #{HIGH_NODE_CPU} cores | RAM: #{HIGH_NODE_MEM}MB"
+            @printed_nodes[node_name] = true
+          end
+        else
+          # Default node configuration
+          vb.memory = DEFAULT_NODE_MEM
+          vb.cpus = DEFAULT_NODE_CPU
+          # Print configuration only once per node
+          unless @printed_nodes[node_name]
+            puts "⚙️  Configuring #{node_name} as REGULAR NODE"
+            puts "   CPU: #{DEFAULT_NODE_CPU} core | RAM: #{DEFAULT_NODE_MEM}MB"
+            @printed_nodes[node_name] = true
+          end
+        end
+        
+        # VM customizations for better stability
+        vb.gui = false
+        vb.customize ["modifyvm", :id, "--cableconnected1", "on"]
+        vb.customize ["modifyvm", :id, "--cableconnected2", "on"]
+        vb.customize ["modifyvm", :id, "--ioapic", "on"]
+        vb.customize ["modifyvm", :id, "--rtcuseutc", "on"]
         
         if Vagrant::Util::Platform.windows?
           vb.customize ["modifyvm", :id, "--nictype1", "virtio"]
           vb.customize ["modifyvm", :id, "--nictype2", "virtio"]
+          # Disable audio for better performance
+          vb.customize ["modifyvm", :id, "--audio", "none"]
         end
+        
+        # Add some debugging information
+        puts "💡 VM #{node_name} will use port #{node_port} for SSH"
       end
+      
+      # Pre-boot shell to fix potential issues
+      node_config.vm.provision "fix-boot-issues", type: "shell", run: "once", inline: <<-SHELL
+        # This script runs before the VM boots
+        echo "Preparing #{node_name} for boot..."
+      SHELL
       
       # Node bootstrap
       node_config.vm.provision "bootstrap", type: "shell", inline: <<-SHELL
         echo "=== Bootstrapping #{node_name} ==="
+        
+        # First, make sure network is working
+        echo "Checking network connectivity..."
+        ping -c 2 8.8.8.8 || echo "Warning: Could not ping external network"
         
         # DNS configuration
         cat > /etc/systemd/resolved.conf <<EOF
@@ -188,9 +262,36 @@ EOF
         systemctl restart systemd-resolved
         systemctl enable systemd-resolved
         
-        apt-get update
+        # Wait for network to be fully up
+        echo "Waiting for network to be ready..."
+        sleep 5
+        
+        # Update apt with retry logic
+        echo "Updating package lists..."
+        for i in {1..5}; do
+          apt-get update && break
+          echo "Attempt $i failed, retrying in 10 seconds..."
+          sleep 10
+        done
+        
         DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -q
         DEBIAN_FRONTEND=noninteractive apt-get install -y -q curl wget vim git net-tools python3 python3-pip openssh-server
+        
+        # Install monitoring utilities
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -q htop neofetch sysstat
+        
+        # Add node information to bashrc
+        cat >> /home/vagrant/.bashrc <<EOF
+        
+# Display node information
+echo "=== Node Information ==="
+echo "Hostname: \$(hostname)"
+echo "IP Address: \$(hostname -I | awk '{print \$1}')"
+echo "CPU Cores: \$(nproc)"
+echo "Total RAM: \$(free -h | awk '/^Mem:/ {print \$2}')"
+echo "Uptime: \$(uptime -p)"
+echo "========================="
+EOF
         
         # Add all nodes to hosts file
         echo "# Cluster nodes" >> /etc/hosts
@@ -201,16 +302,44 @@ EOF
           "echo '#{other_node_ip} #{other_node_name}' >> /etc/hosts"
         }.join("\n")}
         
+        # Configure SSH for key-based authentication only
         sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
         sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config
         systemctl enable ssh
         systemctl restart ssh
         
+        # Create shared directory
         mkdir -p /cluster
         chown vagrant:vagrant /cluster
+        
+        # Create high node marker if this is the high node
+        #{if HIGH_NODE_ENABLED && i == HIGH_NODE_INDEX
+          "echo 'Creating high node marker...'
+           echo 'HIGH_NODE=true' > /etc/high-node.info
+           echo 'HIGH_NODE_CPU=#{HIGH_NODE_CPU}' >> /etc/high-node.info
+           echo 'HIGH_NODE_MEM=#{HIGH_NODE_MEM}' >> /etc/high-node.info
+           echo 'This node has elevated resources for special workloads' >> /etc/high-node.info"
+        end}
+        
         echo "=== Basic setup for #{node_name} completed ==="
+        
+        # Display node configuration information
+        #{if HIGH_NODE_ENABLED && i == HIGH_NODE_INDEX
+          "echo '=== HIGH NODE CONFIGURATION ==='
+           echo 'This node is configured with elevated resources:'
+           echo '- CPU Cores: #{HIGH_NODE_CPU}'
+           echo '- Memory: #{HIGH_NODE_MEM}MB'
+           echo '==============================='"
+        else
+          "echo '=== REGULAR NODE ==='
+           echo 'This node has standard resources:'
+           echo '- CPU Cores: #{DEFAULT_NODE_CPU}'
+           echo '- Memory: #{DEFAULT_NODE_MEM}MB'
+           echo '==============================='"
+        end}
       SHELL
 
+      # Setup SSH access from jump host
       node_config.vm.provision "jump-host-access", type: "shell", inline: <<-SHELL
         echo "=== Setting up SSH access for Jump Host on #{node_name} ==="
         
