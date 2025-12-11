@@ -30,7 +30,7 @@ Vagrant.configure("2") do |config|
   config.ssh.keep_alive = true
   
   # Increase boot timeout for nodes
-  config.vm.boot_timeout = 600  # 10 minutes instead of default 5
+  config.vm.boot_timeout = 900  # 15 minutes instead of default 5
 
   # ==================== JUMP HOST ====================
   config.vm.define "jump" do |jump_config|
@@ -50,6 +50,9 @@ Vagrant.configure("2") do |config|
       # Add VM customization for better stability
       vb.gui = false
       vb.customize ["modifyvm", :id, "--cableconnected1", "on"]
+      vb.customize ["modifyvm", :id, "--audio", "none"]
+      vb.customize ["modifyvm", :id, "--usb", "off"]
+      vb.customize ["modifyvm", :id, "--usbehci", "off"]
       if Vagrant::Util::Platform.windows?
         vb.customize ["modifyvm", :id, "--nictype1", "virtio"]
         vb.customize ["modifyvm", :id, "--nictype2", "virtio"]
@@ -150,6 +153,8 @@ Host #{node_name}
     StrictHostKeyChecking no
     UserKnownHostsFile /dev/null
     ConnectTimeout 10
+    ServerAliveInterval 60
+    ServerAliveCountMax 5
 
 SSHCONFIG"
       }.join("\n")}
@@ -157,6 +162,125 @@ SSHCONFIG"
       chmod 600 /home/vagrant/.ssh/config
       chown vagrant:vagrant /home/vagrant/.ssh/config
       echo "Updated SSH config with #{NODE_COUNT} nodes"
+      
+      # ==================== CLUSTER STATUS CHECK SCRIPT ====================
+      # Create a script to check cluster status
+      cat > /home/vagrant/check-cluster.sh <<'CHECK_SCRIPT'
+#!/bin/bash
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+echo -e "${CYAN}=== CLUSTER STATUS CHECK ===${NC}"
+echo "Checking connectivity to all nodes..."
+echo ""
+
+# Function to check a single node
+check_node() {
+  local node_name=$1
+  local timeout=2
+  
+  echo -e "${BLUE}Checking ${node_name}...${NC}"
+  
+  # Try to connect and get resource information
+  ssh_output=$(ssh -o ConnectTimeout=$timeout $node_name "
+    echo -n '  Status: '
+    if [ -f /etc/high-node.info ]; then
+      echo -e '${GREEN}HIGH NODE${NC}'
+      echo '  Resources configured:'
+      grep 'HIGH_NODE_CPU' /etc/high-node.info | sed 's/HIGH_NODE_CPU=/    CPU: /'
+      grep 'HIGH_NODE_MEM' /etc/high-node.info | sed 's/HIGH_NODE_MEM=/    RAM: /' | sed 's/$/ MB/'
+    else
+      echo -e '${YELLOW}REGULAR NODE${NC}'
+    fi
+    
+    echo -n '  Connection: '
+    hostname -I | awk '{print \$1}'
+    
+    echo -n '  Actual CPU cores: '
+    nproc
+    
+    echo -n '  Actual RAM: '
+    free -m | awk '/^Mem:/ {printf \"%d MB\n\", \$2}'
+    
+    echo -n '  Load average: '
+    uptime | awk -F'load average:' '{print \$2}' | xargs
+    
+    echo -n '  Disk usage: '
+    df -h / | awk 'NR==2 {print \$5 \" of \" \$2}'
+    
+    echo -n '  Uptime: '
+    uptime -p | sed 's/up //'
+  " 2>/dev/null)
+  
+  if [ $? -eq 0 ]; then
+    echo -e "$ssh_output"
+    echo -e "  ${GREEN}✓ OK${NC}"
+    return 0
+  else
+    echo -e "  ${RED}✗ FAILED - Cannot connect${NC}"
+    return 1
+  fi
+}
+
+# Check all nodes
+total_nodes=#{NODE_COUNT}
+online_nodes=0
+
+for i in $(seq 1 $total_nodes); do
+  echo "----------------------------------------"
+  if check_node "node$i"; then
+    ((online_nodes++))
+  fi
+  echo ""
+done
+
+echo "========================================"
+echo -e "${CYAN}SUMMARY:${NC}"
+echo -e "  Total nodes configured: ${total_nodes}"
+echo -e "  Online nodes: ${GREEN}${online_nodes}${NC}"
+echo -e "  Offline nodes: ${RED}$((total_nodes - online_nodes))${NC}"
+
+if [ $online_nodes -eq $total_nodes ]; then
+  echo -e "${GREEN}✅ All nodes are online and responding!${NC}"
+  echo ""
+  echo "You can SSH to any node using:"
+  echo "  ssh node1"
+  echo "  ssh node2"
+  echo "  ..."
+  echo "  ssh node$total_nodes"
+else
+  echo -e "${YELLOW}⚠ Some nodes are offline or not responding.${NC}"
+  echo ""
+  echo "Troubleshooting tips:"
+  echo "  1. Check if VMs are running: vagrant status"
+  echo "  2. Start offline nodes: vagrant up nodeX"
+  echo "  3. Check network connectivity"
+fi
+
+# Quick connectivity test (your original command)
+echo ""
+echo -e "${CYAN}Quick connectivity test:${NC}"
+for i in {1..#{NODE_COUNT}}; do
+  if ssh -o ConnectTimeout=2 node$i "echo -n 'node$i: '" 2>/dev/null; then
+    echo -e "${GREEN}OK${NC}"
+  else
+    echo -e "${RED}FAILED${NC}"
+  fi
+done
+CHECK_SCRIPT
+      
+      chmod +x /home/vagrant/check-cluster.sh
+      chown vagrant:vagrant /home/vagrant/check-cluster.sh
+      
+      # Create alias for easy access
+      echo "alias cluster-status='/home/vagrant/check-cluster.sh'" >> /home/vagrant/.bashrc
+      echo "alias cs='/home/vagrant/check-cluster.sh'" >> /home/vagrant/.bashrc
       
       echo "=== Dynamic configuration completed ==="
       echo "Total nodes configured: #{NODE_COUNT}"
@@ -166,7 +290,17 @@ SSHCONFIG"
         "echo 'High node: DISABLED (all nodes have equal resources)'"
       end}
       echo "Node IP range: #{NODE_IP_BASE}.#{NODE_IP_START} - #{NODE_IP_BASE}.#{NODE_IP_START + NODE_COUNT - 1}"
-      echo "SSH to nodes: ssh node1, ssh node2, ..., ssh node#{NODE_COUNT}"
+      echo ""
+      echo -e "\033[1;36m=== IMPORTANT: CLUSTER MANAGEMENT COMMANDS ===\033[0m"
+      echo "To check cluster status: vagrant ssh jump --command '/home/vagrant/check-cluster.sh'"
+      echo "Or from jump host: ./check-cluster.sh"
+      echo "Quick alias: 'cluster-status' or 'cs'"
+      echo ""
+      echo "SSH to nodes:"
+      echo "  ssh node1, ssh node2, ..., ssh node#{NODE_COUNT}"
+      echo ""
+      echo "Your original command is also available:"
+      echo "  for i in {1..#{NODE_COUNT}}; do ssh -o ConnectTimeout=2 node\$i \"echo node\$i: OK\" 2>/dev/null || echo \"node\$i: FAILED\"; done"
     SHELL
   end
 
@@ -224,33 +358,24 @@ SSHCONFIG"
         vb.gui = false
         vb.customize ["modifyvm", :id, "--cableconnected1", "on"]
         vb.customize ["modifyvm", :id, "--cableconnected2", "on"]
-        vb.customize ["modifyvm", :id, "--ioapic", "on"]
-        vb.customize ["modifyvm", :id, "--rtcuseutc", "on"]
+        vb.customize ["modifyvm", :id, "--audio", "none"]
+        vb.customize ["modifyvm", :id, "--usb", "off"]
+        vb.customize ["modifyvm", :id, "--usbehci", "off"]
+        vb.customize ["modifyvm", :id, "--graphicscontroller", "vmsvga"]
+        vb.customize ["modifyvm", :id, "--vrde", "off"]
         
         if Vagrant::Util::Platform.windows?
           vb.customize ["modifyvm", :id, "--nictype1", "virtio"]
           vb.customize ["modifyvm", :id, "--nictype2", "virtio"]
-          # Disable audio for better performance
-          vb.customize ["modifyvm", :id, "--audio", "none"]
         end
-        
-        # Add some debugging information
-        puts "💡 VM #{node_name} will use port #{node_port} for SSH"
       end
       
-      # Pre-boot shell to fix potential issues
-      node_config.vm.provision "fix-boot-issues", type: "shell", run: "once", inline: <<-SHELL
-        # This script runs before the VM boots
-        echo "Preparing #{node_name} for boot..."
-      SHELL
-      
-      # Node bootstrap
+      # Node bootstrap with retry logic
       node_config.vm.provision "bootstrap", type: "shell", inline: <<-SHELL
         echo "=== Bootstrapping #{node_name} ==="
         
-        # First, make sure network is working
-        echo "Checking network connectivity..."
-        ping -c 2 8.8.8.8 || echo "Warning: Could not ping external network"
+        # First, wait a bit for system to settle
+        sleep 10
         
         # DNS configuration
         cat > /etc/systemd/resolved.conf <<EOF
@@ -264,18 +389,29 @@ EOF
         
         # Wait for network to be fully up
         echo "Waiting for network to be ready..."
-        sleep 5
+        sleep 10
         
         # Update apt with retry logic
         echo "Updating package lists..."
-        for i in {1..5}; do
-          apt-get update && break
-          echo "Attempt $i failed, retrying in 10 seconds..."
-          sleep 10
+        for attempt in {1..5}; do
+          if apt-get update; then
+            echo "Package lists updated successfully"
+            break
+          else
+            echo "Attempt \$attempt failed, retrying in 10 seconds..."
+            sleep 10
+          fi
         done
         
-        DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -q
-        DEBIAN_FRONTEND=noninteractive apt-get install -y -q curl wget vim git net-tools python3 python3-pip openssh-server
+        # Install minimal packages first
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -q curl wget openssh-server
+        
+        # Start SSH early
+        systemctl enable ssh
+        systemctl start ssh
+        
+        # Then install other packages
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -q vim git net-tools python3 python3-pip
         
         # Install monitoring utilities
         DEBIAN_FRONTEND=noninteractive apt-get install -y -q htop neofetch sysstat
@@ -305,7 +441,8 @@ EOF
         # Configure SSH for key-based authentication only
         sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
         sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config
-        systemctl enable ssh
+        sed -i 's/#ClientAliveInterval 0/ClientAliveInterval 60/' /etc/ssh/sshd_config
+        sed -i 's/#ClientAliveCountMax 3/ClientAliveCountMax 5/' /etc/ssh/sshd_config
         systemctl restart ssh
         
         # Create shared directory
@@ -337,6 +474,13 @@ EOF
            echo '- Memory: #{DEFAULT_NODE_MEM}MB'
            echo '==============================='"
         end}
+        
+        # Final system check
+        echo "System check:"
+        echo "  Hostname: $(hostname)"
+        echo "  IP Address: $(hostname -I | awk '{print \$1}')"
+        echo "  SSH Status: $(systemctl is-active ssh)"
+        echo "  Network: $(ping -c 1 8.8.8.8 > /dev/null 2>&1 && echo 'OK' || echo 'FAILED')"
       SHELL
 
       # Setup SSH access from jump host
@@ -347,10 +491,10 @@ EOF
         chmod 700 /home/vagrant/.ssh
         
         counter=0
-        while [ ! -f /vagrant/jump-host-key.pub ] && [ $counter -lt 180 ]; do
-          echo "Waiting for jump host key... ($counter/180 seconds)"
+        while [ ! -f /vagrant/jump-host-key.pub ] && [ \$counter -lt 180 ]; do
+          echo "Waiting for jump host key... (\$counter/180 seconds)"
           sleep 10
-          counter=$((counter + 10))
+          counter=\$((counter + 10))
         done
         
         if [ -f /vagrant/jump-host-key.pub ]; then
