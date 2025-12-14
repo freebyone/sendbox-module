@@ -177,29 +177,17 @@ Example SSH Config Snippet:
     ServerAliveInterval 60
     ServerAliveCountMax 5
 ```
-## 🛠️ Customization
-
-Add Nodes: Change NODE_COUNT and run vagrant up.
-High Node: Toggle HIGH_NODE_ENABLED, set index/CPU/RAM, then vagrant reload.
-Resources: Adjust vb.memory and vb.cpus in the Vagrantfile's provider block.
-Ansible: Add files to ./ansible/; they sync to /home/vagrant/ansible/ on jump host.
-Networking: Modify IP bases/starts to avoid conflicts.
-
-## 🐛 Troubleshooting
-
-Port Collisions: Vagrant auto-corrects (e.g., "Fixed port collision for 22 => 2203").
-SSH Issues: From jump host, check cat ~/.ssh/config or ssh -vvv node1. Verify keys with check-cluster.sh.
-Provisioning Errors: Re-run vagrant provision <machine>. Check network with ping 8.8.8.8 on nodes.
-VirtualBox Issues: Run VBoxManage list hostonlyifs. Ensure no IP conflicts.
-Debug Mode: vagrant up --debug for verbose logs.
-
 ## 🔄 Maintenance
 
-Update All Nodes (from jump host): for i in {1..5}; do ssh node$i "sudo apt update && sudo apt upgrade -y"; done
-Check Disk Space: for i in {1..5}; do ssh node$i "df -h /"; done
-Check Memory: for i in {1..5}; do ssh node$i "free -h"; done
-Check Services: for i in {1..5}; do ssh node$i "systemctl list-units --type=service --state=running"; done
-Node Info: SSH to a node; .bashrc displays hostname, IP, CPU, RAM, uptime.
+Update All Nodes (from jump host): ```for i in {1..5}; do ssh node$i "sudo apt update && sudo apt upgrade -y"; done```
+
+Check Disk Space: ```for i in {1..5}; do ssh node$i "df -h /"; done```
+
+Check Memory: ```for i in {1..5}; do ssh node$i "free -h"; done```
+
+Check Services: ```for i in {1..5}; do ssh node$i "systemctl list-units --type=service --state=running"; done```
+
+Node Info: SSH to a node;  .bashrc displays hostname, IP, CPU, RAM, uptime.
 
 ## 📚 Use Cases
 
