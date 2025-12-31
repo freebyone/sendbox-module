@@ -1,5 +1,6 @@
+roles:
 - name: ansible-victoriametrics-cluster-role
-  src: https://github.com/Slapper/ansible-victoriametrics-cluster-role
+  src: https://github.com/VictoriaMetrics/ansible-playbooks
   version: master
   scm: git
 
@@ -17,3 +18,7 @@
   src: https://github.com/freebyone/ansible-role-patroni-postgres-cluster
   version: main
   scm: git
+
+collections:
+  - name: community.general
+  - name: ansible.posix

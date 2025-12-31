@@ -1,0 +1,98 @@
+upstream vminsert_cluster {
+    {% for node in insert_nodes_lb %}
+    server {{ node }}:{{ vminsert_port }};
+    {% endfor %}
+}
+
+upstream vmselect_cluster {
+    {% for node in select_nodes_lb %}
+    server {{ node }}:{{ vmselect_port }};
+    {% endfor %}
+}
+
+server {
+    listen 80;
+    server_name victoriametrics.local;
+    
+    # Increase timeouts for large queries
+    proxy_connect_timeout 300s;
+    proxy_send_timeout 300s;
+    proxy_read_timeout 300s;
+    
+    # Health endpoint
+    location /health {
+        access_log off;
+        return 200 "healthy\n";
+        add_header Content-Type text/plain;
+    }
+    
+    location ~ ^/api/v1/write$ {
+        proxy_pass http://vminsert_cluster/insert/0/prometheus$request_uri;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Important for Prometheus remote write
+        proxy_set_header Content-Type "application/x-www-form-urlencoded";
+        client_max_body_size 50M;
+        
+        access_log /var/log/nginx/vm_write.log;
+    }
+    
+    location ~ ^/api/v1/(query|query_range|series|labels|label/.+/values)$ {
+        proxy_pass http://vmselect_cluster$request_uri;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Disable buffering for streaming responses
+        proxy_buffering off;
+        
+        access_log /var/log/nginx/vm_query.log;
+    }
+    
+    location /insert/ {
+        proxy_pass http://vminsert_cluster;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        client_max_body_size 100M;
+        access_log /var/log/nginx/vm_insert.log;
+    }
+    
+    location /select/ {
+        proxy_pass http://vmselect_cluster;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        proxy_buffering off;
+        access_log /var/log/nginx/vm_select.log;
+    }
+    
+    location / {
+        proxy_pass http://127.0.0.1:{{ vmui_port }};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # WebSocket support
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        
+        access_log /var/log/nginx/vm_ui.log;
+    }
+    
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
+}

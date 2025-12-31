@@ -1,31 +1,273 @@
 ---
 - name: Deploy VictoriaMetrics cluster
-  hosts: cluster
-  become: yes
-  vars_files:
-    - "group_vars/victoriametrics.yml"
+  hosts: victoriametrics
+  become: true
+  gather_facts: true
   
+  pre_tasks:
+    - name: Create VictoriaMetrics system user
+      user:
+        name: "{{ victoriametrics_user }}"
+        system: yes
+        shell: /bin/false
+        create_home: no
+      tags: [system, users]
+
+    - name: Create directories for VictoriaMetrics
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ victoriametrics_user }}"
+        group: "{{ victoriametrics_group }}"
+        mode: '0755'
+      loop:
+        - "{{ data_dir }}/vmstorage-data"
+        - "{{ data_dir }}/vmstorage-snapshots"
+        - "{{ cache_dir }}/vmselect"
+        - "/etc/victoriametrics"
+        - "/var/log/victoriametrics"
+      tags: [system, directories]
+
+- name: Deploy vmstorage nodes
+  hosts: vmstorage
+  become: true
+  vars:
+    vmstorage_data_path: "{{ data_dir }}/vmstorage-data"
+    vmstorage_snapshots_path: "{{ data_dir }}/vmstorage-snapshots"
+    vmstorage_retention_period: "{{ retention_period }}"
+    vmstorage_replication_factor: "{{ replication_factor }}"
+    
+    vmstorage_nodes: "{{ groups['vmstorage'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list }}"
+    
   roles:
-    - role: ansible-victoriametrics-cluster-role
-      
+    - role: victoriametrics.vmstorage
+      vars:
+        vmstorage_config:
+          retentionPeriod: "{{ vmstorage_retention_period }}"
+          storageDataPath: "{{ vmstorage_data_path }}"
+          snapshotsPath: "{{ vmstorage_snapshots_path }}"
+          replicationFactor: "{{ vmstorage_replication_factor }}"
+          dedup_min_scrape_interval: "15s"
+          max_concurrent_merges: 8
+          small_merge_concurrency: 2
+          big_merge_concurrency: 1
+        vmstorage_cluster_mode: true
+        vmstorage_cluster_nodes: "{{ vmstorage_nodes | map('regex_replace', '$', ':' + vmstorage_port|string) | join(',') }}"
+  tags: [vmstorage, storage]
+
+- name: Deploy vmselect nodes
+  hosts: vmselect
+  become: true
+  vars:
+    vmselect_cache_dir: "{{ cache_dir }}/vmselect"
+    
+    storage_nodes: "{{ groups['vmstorage'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list }}"
+    
+  roles:
+    - role: victoriametrics.vmselect
+      vars:
+        vmselect_config:
+          storageNode: "{{ storage_nodes | map('regex_replace', '$', ':' + vmstorage_port|string) | join(',') }}"
+          cacheDataPath: "{{ vmselect_cache_dir }}"
+          search_maxQueryDuration: "30s"
+          search_maxUniqueTimeseries: "100000"
+          cache_expire: "5m"
+          search_queryTimeout: "60s"
+        vmselect_distributed: true
+  tags: [vmselect, query]
+
+- name: Deploy vminsert nodes
+  hosts: vminsert
+  become: true
+  vars:
+    storage_nodes: "{{ groups['vmstorage'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list }}"
+    
+  roles:
+    - role: victoriametrics.vminsert
+      vars:
+        vminsert_config:
+          storageNode: "{{ storage_nodes | map('regex_replace', '$', ':' + vmstorage_port|string) | join(',') }}"
+          maxConcurrentInserts: 16
+          insert_maxQueueDuration: "30s"
+          disableRerouting: false
+          reroutingInterval: "5m"
+  tags: [vminsert, ingestion]
+
+- name: Deploy vmagent nodes
+  hosts: vmagent
+  become: true
+  vars:
+    insert_nodes: "{{ groups['vminsert'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list }}"
+    
+  roles:
+    - role: victoriametrics.vmagent
+      vars:
+        vmagent_config:
+          global:
+            external_labels:
+              cluster: "{{ cluster_name }}"
+              hostname: "{{ inventory_hostname }}"
+          scrape_configs:
+            - job_name: 'victoriametrics'
+              static_configs:
+                - targets:
+                  - "localhost:8429"
+              scrape_interval: 15s
+              scrape_timeout: 10s
+            - job_name: 'node'
+              static_configs:
+                - targets: ['localhost:9100']
+              scrape_interval: 15s
+              scrape_timeout: 10s
+          remote_write:
+            - url: "http://{{ insert_nodes[0] }}:{{ vminsert_port }}/insert/0/prometheus/api/v1/write"
+              queue_config:
+                max_samples_per_send: 10000
+                capacity: 100000
+                max_shards: 10
+              write_relabel_configs:
+                - action: keep
+                  regex: '.*'
+                  source_labels: [__name__]
+        vmagent_self_scrape: true
+  tags: [vmagent, agent, monitoring]
+
+- name: Deploy vmui (Web UI)
+  hosts: vmui
+  become: true
+  vars:
+    select_nodes: "{{ groups['vmselect'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list }}"
+    
+  roles:
+    - role: victoriametrics.vmui
+      vars:
+        vmui_config:
+          selectNode: "http://{{ select_nodes[0] }}:{{ vmselect_port }}"
+          # UI settings
+          theme: "dark"
+          defaultStep: "5m"
+          defaultQuery: 'up'
+          basicAuthUsers: []
+        # Enable custom port if needed
+        vmui_port: "{{ vmui_port }}"
+  tags: [vmui, ui, web]
+
+- name: Configure cluster proxy/load balancer
+  hosts: vmui
+  become: true
+  vars:
+    insert_nodes: "{{ groups['vminsert'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list }}"
+    select_nodes: "{{ groups['vmselect'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list }}"
+    
   tasks:
-    - name: Wait for VictoriaMetrics services to start
-      wait_for:
+    - name: Install nginx for load balancing
+      package:
+        name: nginx
+        state: present
+      tags: [proxy, nginx]
+
+    - name: Create nginx configuration for VictoriaMetrics
+      template:
+        src: "templates/nginx/victoriametrics-lb.conf.j2"
+        dest: "/etc/nginx/sites-available/victoriametrics"
+        owner: root
+        group: root
+        mode: '0644'
+      tags: [proxy, nginx]
+
+    - name: Enable VictoriaMetrics site
+      file:
+        src: "/etc/nginx/sites-available/victoriametrics"
+        dest: "/etc/nginx/sites-enabled/victoriametrics"
+        state: link
+      tags: [proxy, nginx]
+
+    - name: Remove default nginx site
+      file:
+        path: "/etc/nginx/sites-enabled/default"
+        state: absent
+      tags: [proxy, nginx]
+
+    - name: Test nginx configuration
+      command: nginx -t
+      register: nginx_test
+      changed_when: false
+      tags: [proxy, nginx]
+
+    - name: Restart nginx
+      service:
+        name: nginx
+        state: restarted
+        enabled: yes
+      when: nginx_test.rc == 0
+      tags: [proxy, nginx]
+
+  handlers:
+    - name: restart nginx
+      service:
+        name: nginx
+        state: restarted
+      tags: [proxy, nginx]
+  tags: [proxy, load-balancer]
+
+- name: Configure firewall rules
+  hosts: cluster_nodes
+  become: true
+  tasks:
+    - name: Allow VictoriaMetrics ports
+      ufw:
+        rule: allow
         port: "{{ item }}"
-        host: "{{ inventory_hostname }}"
-        delay: 5
-        timeout: 60
-      loop: "{{ victoriametrics_ports }}"
-      when: victoriametrics_systemd_configure | bool
-      
-    - name: Check VictoriaMetrics health
+        proto: tcp
+      loop:
+        - "{{ vmstorage_port }}"   # Inter-node communication
+        - "{{ vminsert_port }}"    # Data ingestion
+        - "{{ vmselect_port }}"    # Query API
+        - "{{ vmagent_port }}"     # Agent metrics
+        - "{{ vmui_port }}"        # Web UI
+      when: ansible_os_family == 'Debian'
+      tags: [firewall, security]
+
+    - name: Allow SSH access
+      ufw:
+        rule: allow
+        port: "22"
+        proto: tcp
+      when: ansible_os_family == 'Debian'
+      tags: [firewall, security]
+  tags: [firewall, security]
+
+- name: Verify cluster deployment
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Check vminsert availability
       uri:
-        url: "http://{{ inventory_hostname }}:8428/health"
+        url: "http://{{ hostvars[groups['vminsert'][0]].ansible_default_ipv4.address }}:{{ vminsert_port }}/health"
         method: GET
         status_code: 200
         timeout: 10
-      register: health_check
-      until: health_check.status == 200
-      retries: 5
-      delay: 10
-      ignore_errors: yes
+      register: insert_health
+      tags: [verification, health]
+
+    - name: Check vmselect availability
+      uri:
+        url: "http://{{ hostvars[groups['vmselect'][0]].ansible_default_ipv4.address }}:{{ vmselect_port }}/health"
+        method: GET
+        status_code: 200
+        timeout: 10
+      register: select_health
+      tags: [verification, health]
+
+    - name: Display cluster status
+      debug:
+        msg:
+          - "VictoriaMetrics Cluster Deployment Complete"
+          - "Storage Nodes: {{ groups['vmstorage'] | length }}"
+          - "Insert Nodes: {{ groups['vminsert'] | length }}"
+          - "Select Nodes: {{ groups['vmselect'] | length }}"
+          - "Agent Nodes: {{ groups['vmagent'] | length }}"
+          - "Web UI: http://{{ hostvars[groups['vmui'][0]].ansible_default_ipv4.address }}:{{ vmui_port }}"
+          - "Ingestion URL: http://{{ hostvars[groups['vminsert'][0]].ansible_default_ipv4.address }}:{{ vminsert_port }}/insert/0/prometheus/api/v1/write"
+          - "Query URL: http://{{ hostvars[groups['vmselect'][0]].ansible_default_ipv4.address }}:{{ vmselect_port }}/api/v1/query"
+      tags: [verification, status]
